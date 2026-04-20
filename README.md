@@ -570,6 +570,8 @@ For production-style deployment:
 4. Set `AUTH_MODE=cognito` in the backend.
 5. Set `NEXT_PUBLIC_AUTH_MODE=cognito` in the frontend.
 
+During testing, Gmail/Google email addresses have received Cognito verification codes more reliably and quickly than some school or organization email domains. If a new user does not receive a code, try registering with a Gmail address first.
+
 For a course demo, `DEMO_AUTH_CONFIRM_ENABLED` can be temporarily set to `true` to expose a demo confirmation endpoint/button if email confirmation is unreliable. This is a convenience for evaluation only and should not be used for a real production product.
 
 ### Observability and Metrics
