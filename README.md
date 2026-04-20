@@ -2,6 +2,8 @@
 
 **Author:** Zhiqi Zhang
 
+**Website:** https://main.d2taej5h07fd9k.amplifyapp.com
+
 CareerCat is an agentic AI job search assistant that helps users turn a messy, multi-step job search into a structured workspace. It supports resume-based profile setup, AI job post parsing, job recommendations, application tracking, interview and written assessment coaching, and an observability page for inspecting agent behavior.
 
 The main pain point CareerCat addresses is that job seekers often have to manually copy jobs, track applications in spreadsheets, interpret resume-job fit, and prepare for interviews across disconnected tools. CareerCat brings those steps into one account-based web app where an LLM can decide which workflow or tool should handle the user's request.
