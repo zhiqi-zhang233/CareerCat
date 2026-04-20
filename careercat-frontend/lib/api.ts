@@ -37,6 +37,23 @@ export async function fetchHealthCheck() {
   return response.json();
 }
 
+export async function demoConfirmAccount(email: string): Promise<{ message: string }> {
+  const response = await fetch(`${API_BASE_URL}/auth/demo-confirm`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to confirm demo account");
+  }
+
+  return response.json();
+}
+
 /* =========================
    Profile
 ========================= */

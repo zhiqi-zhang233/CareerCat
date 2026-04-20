@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useState } from "react";
+import { demoConfirmAccount } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 
 type AuthView = "sign_in" | "sign_up" | "confirm";
@@ -74,6 +75,26 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       setMessage("");
       await auth.resendConfirmationCode(email.trim());
       setMessage("A new confirmation code has been sent.");
+    } catch (authError) {
+      setError(errorMessage(authError));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDemoConfirm = async () => {
+    if (!email.trim()) {
+      setError("Enter your email first.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError("");
+      setMessage("");
+      const result = await demoConfirmAccount(email.trim());
+      setView("sign_in");
+      setMessage(result.message);
     } catch (authError) {
       setError(errorMessage(authError));
     } finally {
@@ -210,6 +231,23 @@ export default function AuthGate({ children }: { children: ReactNode }) {
               </button>
             )}
           </div>
+
+          {view === "confirm" && (
+            <div className="mt-5 rounded-lg border border-[#FFB238]/30 bg-[#FFB238]/10 p-4">
+              <p className="text-sm leading-6 text-slate-100">
+                For course evaluation only: if your email service blocks the
+                confirmation code, use demo confirmation and then sign in.
+              </p>
+              <button
+                type="button"
+                onClick={handleDemoConfirm}
+                disabled={submitting}
+                className="mt-3 rounded-lg border border-[#FFB238]/50 px-4 py-2 text-sm font-semibold text-[#FFB238] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Confirm for Demo
+              </button>
+            </div>
+          )}
         </form>
       </section>
     </main>
