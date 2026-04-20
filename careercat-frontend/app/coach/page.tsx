@@ -529,7 +529,8 @@ type MarkdownBlock =
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string }
   | { type: "ordered"; items: string[] }
-  | { type: "unordered"; items: string[] };
+  | { type: "unordered"; items: string[] }
+  | { type: "code"; language: string; text: string };
 
 function CoachMarkdown({ content }: { content: string }) {
   const blocks = parseMarkdownBlocks(content);
@@ -574,6 +575,24 @@ function CoachMarkdown({ content }: { content: string }) {
           );
         }
 
+        if (block.type === "code") {
+          return (
+            <div
+              key={`${block.type}-${blockIndex}`}
+              className="overflow-hidden rounded-lg border border-white/10 bg-[#06143D]"
+            >
+              {block.language && (
+                <div className="border-b border-white/10 px-4 py-2 text-xs uppercase tracking-wide text-slate-400">
+                  {block.language}
+                </div>
+              )}
+              <pre className="overflow-x-auto p-4 text-xs leading-6 text-slate-100">
+                <code className="font-mono">{block.text}</code>
+              </pre>
+            </div>
+          );
+        }
+
         return (
           <p key={`${block.type}-${blockIndex}`} className="text-slate-100">
             {renderInline(block.text)}
@@ -589,6 +608,7 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
   const paragraphLines: string[] = [];
   let activeList: { type: "ordered" | "unordered"; items: string[] } | null =
     null;
+  let activeCode: { language: string; lines: string[] } | null = null;
 
   const flushParagraph = () => {
     if (!paragraphLines.length) return;
@@ -600,6 +620,16 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
     if (!activeList) return;
     blocks.push(activeList);
     activeList = null;
+  };
+
+  const flushCode = () => {
+    if (!activeCode) return;
+    blocks.push({
+      type: "code",
+      language: activeCode.language,
+      text: activeCode.lines.join("\n").trim(),
+    });
+    activeCode = null;
   };
 
   const pushListItem = (type: "ordered" | "unordered", item: string) => {
@@ -615,10 +645,47 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
     .replace(/\r\n/g, "\n")
     .split("\n")
     .forEach((rawLine) => {
+      if (activeCode) {
+        const closingFenceIndex = rawLine.indexOf("```");
+        if (closingFenceIndex >= 0) {
+          activeCode.lines.push(rawLine.slice(0, closingFenceIndex));
+          flushCode();
+          return;
+        }
+
+        activeCode.lines.push(rawLine);
+        return;
+      }
+
       const line = rawLine.trim();
       if (!line) {
         flushList();
         flushParagraph();
+        return;
+      }
+
+      const codeFenceMatch = line.match(/^```([A-Za-z0-9_-]*)\s*(.*)$/);
+      if (codeFenceMatch) {
+        flushList();
+        flushParagraph();
+
+        const language = codeFenceMatch[1] || "";
+        const firstCodeLine = codeFenceMatch[2] || "";
+        const closingFenceIndex = firstCodeLine.indexOf("```");
+
+        if (closingFenceIndex >= 0) {
+          blocks.push({
+            type: "code",
+            language,
+            text: firstCodeLine.slice(0, closingFenceIndex).trim(),
+          });
+          return;
+        }
+
+        activeCode = {
+          language,
+          lines: firstCodeLine ? [firstCodeLine] : [],
+        };
         return;
       }
 
@@ -645,6 +712,7 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
       paragraphLines.push(line);
     });
 
+  flushCode();
   flushList();
   flushParagraph();
 
@@ -657,7 +725,7 @@ function isMarkdownHeading(line: string) {
 
 function renderInline(text: string) {
   const normalizedText = normalizeCoachText(text);
-  const parts = normalizedText.split(/(\*\*[^*]+\*\*)/g);
+  const parts = normalizedText.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
 
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
@@ -665,6 +733,17 @@ function renderInline(text: string) {
         <strong key={`${part}-${index}`} className="font-semibold text-white">
           {part.slice(2, -2)}
         </strong>
+      );
+    }
+
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code
+          key={`${part}-${index}`}
+          className="rounded border border-white/10 bg-[#06143D] px-1.5 py-0.5 font-mono text-[0.85em] text-[#FFCF7A]"
+        >
+          {part.slice(1, -1)}
+        </code>
       );
     }
 
