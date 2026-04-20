@@ -513,16 +513,178 @@ function MessageBubble({ message }: { message: CoachMessage }) {
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-3xl whitespace-pre-wrap rounded-lg border p-4 text-sm leading-6 ${
+        className={`max-w-3xl rounded-lg border p-4 text-sm leading-6 ${
           isUser
-            ? "border-[#FFB238]/40 bg-[#FFB238]/10 text-white"
+            ? "whitespace-pre-wrap border-[#FFB238]/40 bg-[#FFB238]/10 text-white"
             : "border-white/10 bg-white/10 text-slate-100"
         }`}
       >
-        {message.content}
+        {isUser ? message.content : <CoachMarkdown content={message.content} />}
       </div>
     </div>
   );
+}
+
+type MarkdownBlock =
+  | { type: "heading"; text: string }
+  | { type: "paragraph"; text: string }
+  | { type: "ordered"; items: string[] }
+  | { type: "unordered"; items: string[] };
+
+function CoachMarkdown({ content }: { content: string }) {
+  const blocks = parseMarkdownBlocks(content);
+
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, blockIndex) => {
+        if (block.type === "heading") {
+          return (
+            <h3
+              key={`${block.type}-${blockIndex}`}
+              className="pt-1 font-semibold text-[#FFB238]"
+            >
+              {renderInline(block.text)}
+            </h3>
+          );
+        }
+
+        if (block.type === "ordered") {
+          return (
+            <ol
+              key={`${block.type}-${blockIndex}`}
+              className="list-decimal space-y-1 pl-5 text-slate-100"
+            >
+              {block.items.map((item, itemIndex) => (
+                <li key={`${blockIndex}-${itemIndex}`}>{renderInline(item)}</li>
+              ))}
+            </ol>
+          );
+        }
+
+        if (block.type === "unordered") {
+          return (
+            <ul
+              key={`${block.type}-${blockIndex}`}
+              className="list-disc space-y-1 pl-5 text-slate-100"
+            >
+              {block.items.map((item, itemIndex) => (
+                <li key={`${blockIndex}-${itemIndex}`}>{renderInline(item)}</li>
+              ))}
+            </ul>
+          );
+        }
+
+        return (
+          <p key={`${block.type}-${blockIndex}`} className="text-slate-100">
+            {renderInline(block.text)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function parseMarkdownBlocks(content: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  const paragraphLines: string[] = [];
+  let activeList: { type: "ordered" | "unordered"; items: string[] } | null =
+    null;
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    blocks.push({ type: "paragraph", text: paragraphLines.join(" ") });
+    paragraphLines.length = 0;
+  };
+
+  const flushList = () => {
+    if (!activeList) return;
+    blocks.push(activeList);
+    activeList = null;
+  };
+
+  const pushListItem = (type: "ordered" | "unordered", item: string) => {
+    flushParagraph();
+    if (!activeList || activeList.type !== type) {
+      flushList();
+      activeList = { type, items: [] };
+    }
+    activeList.items.push(item);
+  };
+
+  content
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .forEach((rawLine) => {
+      const line = rawLine.trim();
+      if (!line) {
+        flushList();
+        flushParagraph();
+        return;
+      }
+
+      const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
+      if (orderedMatch) {
+        pushListItem("ordered", orderedMatch[1]);
+        return;
+      }
+
+      const unorderedMatch = line.match(/^[-*]\s+(.*)$/);
+      if (unorderedMatch) {
+        pushListItem("unordered", unorderedMatch[1]);
+        return;
+      }
+
+      if (isMarkdownHeading(line)) {
+        flushList();
+        flushParagraph();
+        blocks.push({ type: "heading", text: line });
+        return;
+      }
+
+      flushList();
+      paragraphLines.push(line);
+    });
+
+  flushList();
+  flushParagraph();
+
+  return blocks.length ? blocks : [{ type: "paragraph", text: content }];
+}
+
+function isMarkdownHeading(line: string) {
+  return /^\*\*[^*]+:?\*\*$/.test(line) && line.length <= 80;
+}
+
+function renderInline(text: string) {
+  const normalizedText = normalizeCoachText(text);
+  const parts = normalizedText.split(/(\*\*[^*]+\*\*)/g);
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={`${part}-${index}`} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
+function normalizeCoachText(text: string) {
+  return text
+    .replace(/\\\(/g, "(")
+    .replace(/\\\)/g, ")")
+    .replace(/\\\[/g, "[")
+    .replace(/\\\]/g, "]")
+    .replace(/\\_/g, "_")
+    .replace(/\\alpha/g, "alpha")
+    .replace(/\\beta/g, "beta")
+    .replace(/\\mu/g, "mu")
+    .replace(/\\sigma/g, "sigma")
+    .replace(/\\leq?/g, "<=")
+    .replace(/\\geq?/g, ">=");
 }
 
 function ErrorBox({ message }: { message: string }) {

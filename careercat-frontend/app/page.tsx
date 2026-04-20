@@ -8,10 +8,10 @@ import type { AgentAssistResponse } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
 
 const STARTERS = [
-  "Find me fresh Data Analyst jobs in Chicago posted this week.",
-  "I have a job description and want to know if I should save it.",
-  "Help me improve my resume for a saved job.",
-  "Start a technical mock interview for SQL and Python.",
+  "I want to create a new profile and upload my resume.",
+  "I want to import a job description and save the structured job information.",
+  "Recommend jobs for me based on specific requirements like role, location, salary, and posting date.",
+  "I want to review my current application status and saved jobs.",
   "Train me for a written assessment on statistics.",
 ];
 
@@ -34,6 +34,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const canContinue = decision ? hasActionableRoute(decision) : false;
+
+  const fillStarter = (starter: string) => {
+    setMessage(starter);
+    setDecision(null);
+    setError("");
+  };
 
   const runAgent = async (nextMessage = message) => {
     if (!userId) {
@@ -134,7 +140,7 @@ export default function Home() {
                 <button
                   type="button"
                   key={starter}
-                  onClick={() => runAgent(starter)}
+                  onClick={() => fillStarter(starter)}
                   className="rounded-lg border border-white/10 bg-white/5 p-4 text-left text-sm leading-6 text-slate-200 transition hover:border-[#FFB238]/50 hover:bg-white/10"
                 >
                   {starter}
@@ -230,7 +236,7 @@ export default function Home() {
                       <button
                         type="button"
                         key={starter}
-                        onClick={() => runAgent(starter)}
+                        onClick={() => fillStarter(starter)}
                         className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left text-xs leading-5 text-slate-200 transition hover:border-[#FFB238]/50"
                       >
                         {starter}
