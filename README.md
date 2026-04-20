@@ -10,7 +10,7 @@ The main pain point CareerCat addresses is that job seekers often have to manual
 
 ```mermaid
 flowchart LR
-    User["User / Evaluator"] --> Frontend["Next.js Frontend"]
+    User["User"] --> Frontend["Next.js Frontend"]
     Frontend --> Cognito["Amazon Cognito"]
     Frontend --> Backend["FastAPI Backend"]
     Backend --> DynamoDB["Amazon DynamoDB"]
@@ -35,7 +35,7 @@ flowchart LR
 - **AI Career Coach:** The coach supports resume-job gap analysis, technical mock interviews, behavioral mock interviews, and written assessment practice.
 - **Language-aware code rendering:** Coach responses render fenced code blocks with syntax highlighting for common languages such as Python, SQL, JavaScript, TypeScript, JSON, Bash, HTML/XML, CSS, Java, C++, C#, R, Go, Rust, and YAML.
 - **Developer observability page:** A gear icon opens a developer-facing page that shows agent runs, workflow decisions, errors, latency, success rates, tool usage, and quality checks.
-- **Quality metric demo:** The observability page includes a Sponsorship Filter Accuracy Check where evaluators can choose a random sample size and visualize how sponsorship filtering performs.
+- **Quality metric demo:** The observability page includes a Sponsorship Filter Accuracy Check where a reviewer can choose a random sample size and visualize how sponsorship filtering performs.
 
 ## Set Up Instructions
 
@@ -305,9 +305,9 @@ Go to **Coach** to start a coaching session. CareerCat supports three coaching m
 
 ### 7. Inspect Observability and Metrics
 
-Open the gear icon in the header to view the developer observability page. This page is designed to be readable for evaluators, not just engineers. It shows recent agent runs, workflow decisions, selected tools, status, latency, inputs, outputs, errors, and summary metrics.
+Open the gear icon in the header to view the developer observability page. This page is designed to be readable for reviewers and non-specialist stakeholders, not just engineers. It shows recent agent runs, workflow decisions, selected tools, status, latency, inputs, outputs, errors, and summary metrics.
 
-The page also includes a quality metric demo: **Sponsorship Filter Accuracy Check**. An evaluator can choose a random sample size, run the check, and see how accurately the sponsorship filter handles labeled examples.
+The page also includes a quality metric demo: **Sponsorship Filter Accuracy Check**. A reviewer can choose a random sample size, run the check, and see how accurately the sponsorship filter handles labeled examples.
 
 ### Example API Check
 
@@ -351,7 +351,7 @@ Expected response:
 ### Tools, Services, and APIs
 
 - Amazon Bedrock for LLM-powered parsing, routing, recommendations, and coaching
-- Amazon DynamoDB for user data and observability records
+- Amazon DynamoDB for user data, coach sessions, and observability records
 - Amazon Cognito for production account authentication
 - AWS App Runner for backend deployment
 - AWS Amplify Hosting for frontend deployment
@@ -445,7 +445,7 @@ CareerCat/
 - `app/schemas/`: Pydantic request and response models.
 - `app/services/bedrock_service.py`: Bedrock LLM calls and structured parsing helpers.
 - `app/services/agent_assist_service.py`: Agent Assist routing and tool-selection logic.
-- `app/services/dynamodb_service.py`: DynamoDB persistence for profiles, jobs, and observability records.
+- `app/services/dynamodb_service.py`: DynamoDB persistence for profiles, jobs, coach sessions, and observability records.
 - `app/services/sponsorship_filter_service.py`: Sponsorship filtering and quality-check samples.
 
 ### Important Frontend Areas
@@ -456,7 +456,7 @@ CareerCat/
 - `app/recommendations/page.tsx`: Adzuna-backed job discovery UI.
 - `app/dashboard/page.tsx`: Saved job board with status tracking, filtering, and sorting.
 - `app/coach/page.tsx`: AI Career Coach sessions and code-aware Markdown rendering.
-- `app/observability/page.tsx`: Developer/evaluator observability and metrics page.
+- `app/observability/page.tsx`: Developer observability and metrics page.
 - `components/AuthGate.tsx`: Switches between local auth and Cognito auth.
 - `lib/api.ts`: Frontend API client.
 
@@ -485,6 +485,8 @@ https://rpgqpmg46v.us-east-2.awsapprunner.com
 ```
 
 These URLs may change if the AWS services are recreated.
+
+The submitted AWS backend reads `BEDROCK_MODEL_ID` from environment variables. The current deployment uses `nvidia.nemotron-nano-12b-v2`; local or reproduced deployments can use another Bedrock chat model if the prompt/response format is compatible.
 
 ### Frontend Deployment With AWS Amplify
 
@@ -572,7 +574,7 @@ For production-style deployment:
 
 During testing, Gmail/Google email addresses have received Cognito verification codes more reliably and quickly than some school or organization email domains. If a new user does not receive a code, try registering with a Gmail address first.
 
-For a course demo, `DEMO_AUTH_CONFIRM_ENABLED` can be temporarily set to `true` to expose a demo confirmation endpoint/button if email confirmation is unreliable. This is a convenience for evaluation only and should not be used for a real production product.
+For a course demo, `DEMO_AUTH_CONFIRM_ENABLED` can be temporarily set to `true` to expose a demo confirmation endpoint/button if email confirmation is unreliable. The submitted course deployment currently enables this convenience so reviewers are not blocked by email delivery issues. This should not be used for a real production product.
 
 ### Observability and Metrics
 
@@ -587,7 +589,7 @@ CareerCat records workflow traces in the `AgentRuns` DynamoDB table. Coach conve
 - Workflow usage counts.
 - Sponsorship Filter Accuracy Check as a quality metric.
 
-These records help evaluators see that the LLM is not only generating text, but making workflow decisions, choosing tools, and producing inspectable system behavior.
+These records make it clear that the LLM is not only generating text, but making workflow decisions, choosing tools, and producing inspectable system behavior.
 
 ### Why This System Is Agentic
 
