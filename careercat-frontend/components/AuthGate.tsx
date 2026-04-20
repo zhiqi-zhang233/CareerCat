@@ -62,6 +62,25 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     }
   };
 
+  const handleResendCode = async () => {
+    if (!email.trim()) {
+      setError("Enter your email first.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError("");
+      setMessage("");
+      await auth.resendConfirmationCode(email.trim());
+      setMessage("A new confirmation code has been sent.");
+    } catch (authError) {
+      setError(errorMessage(authError));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#011A55] px-6 py-16 text-white">
       <section className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_420px] lg:items-center">
@@ -178,6 +197,16 @@ export default function AuthGate({ children }: { children: ReactNode }) {
                 className="text-[#FFB238] hover:underline"
               >
                 I have a confirmation code
+              </button>
+            )}
+            {view === "confirm" && (
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={submitting}
+                className="text-[#FFB238] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Resend code
               </button>
             )}
           </div>

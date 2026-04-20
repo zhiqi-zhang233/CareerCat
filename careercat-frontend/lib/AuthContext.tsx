@@ -32,6 +32,7 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   confirmSignUp: (email: string, code: string) => Promise<void>;
+  resendConfirmationCode: (email: string) => Promise<void>;
   signOut: () => void;
   createNewLocalAccount: () => void;
   clearError: () => void;
@@ -171,6 +172,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const resendConfirmationCode = useCallback(async (nextEmail: string) => {
+    const userPool = getUserPool();
+    if (!userPool) {
+      throw new Error("Cognito is not configured.");
+    }
+
+    const user = new CognitoUser({
+      Username: nextEmail,
+      Pool: userPool,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      user.resendConfirmationCode((resendError) => {
+        if (resendError) {
+          reject(resendError);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }, []);
+
   const signOut = useCallback(() => {
     if (isCognito) {
       getUserPool()?.getCurrentUser()?.signOut();
@@ -201,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signUp,
       confirmSignUp,
+      resendConfirmationCode,
       signOut,
       createNewLocalAccount,
       clearError: () => setError(""),
@@ -215,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       signUp,
+      resendConfirmationCode,
       status,
       userId,
     ]
