@@ -980,16 +980,12 @@ function escapeHtml(text: string) {
 
 function renderInline(text: string) {
   const normalizedText = normalizeCoachText(text);
-  const parts = normalizedText.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  const parts = normalizedText.split(
+    /(`[^`\n]+`|\*\*[^*]+(?:\*\*|\*)|__[^_]+__|\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g
+  );
 
   return parts.map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return (
-        <strong key={`${part}-${index}`} className="font-semibold text-white">
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
+    if (!part) return null;
 
     if (part.startsWith("`") && part.endsWith("`")) {
       return (
@@ -1002,8 +998,61 @@ function renderInline(text: string) {
       );
     }
 
-    return <span key={`${part}-${index}`}>{part}</span>;
+    if (part.startsWith("**")) {
+      return (
+        <strong key={`${part}-${index}`} className="font-semibold text-white">
+          {stripStrongMarkers(part, "**")}
+        </strong>
+      );
+    }
+
+    if (part.startsWith("__") && part.endsWith("__")) {
+      return (
+        <strong key={`${part}-${index}`} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return (
+        <em key={`${part}-${index}`} className="italic text-slate-100">
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+
+    if (part.startsWith("_") && part.endsWith("_")) {
+      return (
+        <em key={`${part}-${index}`} className="italic text-slate-100">
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+
+    return <span key={`${part}-${index}`}>{cleanDanglingEmphasis(part)}</span>;
   });
+}
+
+function stripStrongMarkers(text: string, marker: "**" | "__") {
+  const startLength = marker.length;
+  if (text.endsWith(marker)) {
+    return text.slice(startLength, -startLength);
+  }
+
+  if (marker === "**" && text.endsWith("*")) {
+    return text.slice(startLength, -1);
+  }
+
+  return text.slice(startLength);
+}
+
+function cleanDanglingEmphasis(text: string) {
+  return text
+    .replace(/(^|\s)\*\*(?=\S)/g, "$1")
+    .replace(/(?<=\S)\*\*(?=\s|$)/g, "")
+    .replace(/(^|\s)__(?=\S)/g, "$1")
+    .replace(/(?<=\S)__(?=\s|$)/g, "");
 }
 
 function normalizeCoachText(text: string) {
