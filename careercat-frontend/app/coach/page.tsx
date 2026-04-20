@@ -1,5 +1,21 @@
 "use client";
 
+import hljs from "highlight.js/lib/core";
+import bash from "highlight.js/lib/languages/bash";
+import cpp from "highlight.js/lib/languages/cpp";
+import csharp from "highlight.js/lib/languages/csharp";
+import css from "highlight.js/lib/languages/css";
+import go from "highlight.js/lib/languages/go";
+import java from "highlight.js/lib/languages/java";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import python from "highlight.js/lib/languages/python";
+import r from "highlight.js/lib/languages/r";
+import rust from "highlight.js/lib/languages/rust";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
+import yaml from "highlight.js/lib/languages/yaml";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { fetchUserJobs, sendCoachChat } from "@/lib/api";
@@ -32,6 +48,57 @@ const MODE_LABELS: Record<CoachMode, string> = {
   mock_interview: "Mock Interview",
   written_practice: "Written Assessment",
 };
+
+const CODE_LANGUAGES = [
+  "bash",
+  "cpp",
+  "csharp",
+  "css",
+  "go",
+  "java",
+  "javascript",
+  "json",
+  "python",
+  "r",
+  "rust",
+  "sql",
+  "typescript",
+  "xml",
+  "yaml",
+];
+
+const LANGUAGE_ALIASES: Record<string, string> = {
+  c: "cpp",
+  "c++": "cpp",
+  cs: "csharp",
+  csharp: "csharp",
+  html: "xml",
+  js: "javascript",
+  jsx: "javascript",
+  py: "python",
+  sh: "bash",
+  shell: "bash",
+  ts: "typescript",
+  tsx: "typescript",
+  yml: "yaml",
+  zsh: "bash",
+};
+
+hljs.registerLanguage("bash", bash);
+hljs.registerLanguage("cpp", cpp);
+hljs.registerLanguage("csharp", csharp);
+hljs.registerLanguage("css", css);
+hljs.registerLanguage("go", go);
+hljs.registerLanguage("java", java);
+hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("json", json);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("r", r);
+hljs.registerLanguage("rust", rust);
+hljs.registerLanguage("sql", sql);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("xml", xml);
+hljs.registerLanguage("yaml", yaml);
 
 export default function CoachPage() {
   const userId = useLocalUserId();
@@ -576,21 +643,7 @@ function CoachMarkdown({ content }: { content: string }) {
         }
 
         if (block.type === "code") {
-          return (
-            <div
-              key={`${block.type}-${blockIndex}`}
-              className="overflow-hidden rounded-lg border border-white/10 bg-[#06143D]"
-            >
-              {block.language && (
-                <div className="border-b border-white/10 px-4 py-2 text-xs uppercase tracking-wide text-slate-400">
-                  {block.language}
-                </div>
-              )}
-              <pre className="overflow-x-auto p-4 text-xs leading-6 text-slate-100">
-                <code className="font-mono">{block.text}</code>
-              </pre>
-            </div>
-          );
+          return <CodeBlock key={`${block.type}-${blockIndex}`} block={block} />;
         }
 
         return (
@@ -721,6 +774,111 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
 
 function isMarkdownHeading(line: string) {
   return /^\*\*[^*]+:?\*\*$/.test(line) && line.length <= 80;
+}
+
+function CodeBlock({
+  block,
+}: {
+  block: Extract<MarkdownBlock, { type: "code" }>;
+}) {
+  const highlightedCode = highlightCode(block.text, block.language);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/10 bg-[#06143D]">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
+        <span className="text-xs uppercase tracking-wide text-slate-400">
+          {highlightedCode.label}
+        </span>
+        {highlightedCode.detected && (
+          <span className="text-xs text-slate-500">auto-detected</span>
+        )}
+      </div>
+      <pre className="coach-code overflow-x-auto p-4 text-xs leading-6 text-slate-100">
+        <code
+          className="font-mono"
+          dangerouslySetInnerHTML={{ __html: highlightedCode.html }}
+        />
+      </pre>
+    </div>
+  );
+}
+
+function highlightCode(text: string, language: string) {
+  const normalizedLanguage = normalizeCodeLanguage(language);
+
+  if (normalizedLanguage && hljs.getLanguage(normalizedLanguage)) {
+    try {
+      return {
+        html: hljs.highlight(text, {
+          language: normalizedLanguage,
+          ignoreIllegals: true,
+        }).value,
+        label: formatLanguageLabel(normalizedLanguage),
+        detected: false,
+      };
+    } catch {
+      return {
+        html: escapeHtml(text),
+        label: formatLanguageLabel(normalizedLanguage),
+        detected: false,
+      };
+    }
+  }
+
+  try {
+    const result = hljs.highlightAuto(text, CODE_LANGUAGES);
+    return {
+      html: result.value,
+      label: result.language ? formatLanguageLabel(result.language) : "Code",
+      detected: Boolean(result.language),
+    };
+  } catch {
+    return {
+      html: escapeHtml(text),
+      label: "Code",
+      detected: false,
+    };
+  }
+}
+
+function normalizeCodeLanguage(language: string) {
+  const normalized = language
+    .trim()
+    .toLowerCase()
+    .replace(/^language-/, "");
+
+  return LANGUAGE_ALIASES[normalized] || normalized;
+}
+
+function formatLanguageLabel(language: string) {
+  const labels: Record<string, string> = {
+    bash: "Bash",
+    cpp: "C++",
+    csharp: "C#",
+    css: "CSS",
+    go: "Go",
+    java: "Java",
+    javascript: "JavaScript",
+    json: "JSON",
+    python: "Python",
+    r: "R",
+    rust: "Rust",
+    sql: "SQL",
+    typescript: "TypeScript",
+    xml: "HTML/XML",
+    yaml: "YAML",
+  };
+
+  return labels[language] || "Code";
+}
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function renderInline(text: string) {
