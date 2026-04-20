@@ -3,6 +3,7 @@ import type {
   AgentAssistRequest,
   AgentRun,
   CoachChatRequest,
+  CoachSession,
   JobDiscoveryRequest,
   JobRecommendation,
   JobUpdatePayload,
@@ -284,6 +285,58 @@ export async function sendCoachChat(payload: CoachChatRequest) {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(errorText || "Failed to send coach message");
+  }
+
+  return response.json();
+}
+
+export async function fetchCoachSessions(
+  userId: string
+): Promise<{ user_id: string; sessions: CoachSession[] }> {
+  const response = await fetch(`${API_BASE_URL}/coach/sessions/${userId}`, {
+    headers: await buildHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to fetch coach sessions");
+  }
+
+  return response.json();
+}
+
+export async function saveCoachSession(session: CoachSession) {
+  const response = await fetch(
+    `${API_BASE_URL}/coach/sessions/${session.user_id}/${session.session_id}`,
+    {
+      method: "PUT",
+      headers: await buildHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify(session),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to save coach session");
+  }
+
+  return response.json();
+}
+
+export async function deleteCoachSession(userId: string, sessionId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/coach/sessions/${userId}/${sessionId}`,
+    {
+      method: "DELETE",
+      headers: await buildHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to delete coach session");
   }
 
   return response.json();

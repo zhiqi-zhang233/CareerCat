@@ -19,26 +19,21 @@ import yaml from "highlight.js/lib/languages/yaml";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Header from "@/components/Header";
-import { fetchUserJobs, sendCoachChat } from "@/lib/api";
+import {
+  deleteCoachSession,
+  fetchCoachSessions,
+  fetchUserJobs,
+  saveCoachSession,
+  sendCoachChat,
+} from "@/lib/api";
 import type {
   AgentAssistResponse,
   CoachMessage,
   CoachMode,
+  CoachSession,
   JobPost,
 } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
-
-type CoachSession = {
-  id: string;
-  title: string;
-  mode: CoachMode;
-  subtype?: string;
-  job_id?: string;
-  focus_topic?: string;
-  messages: CoachMessage[];
-  created_at: string;
-  updated_at: string;
-};
 
 type JobsResponse = {
   jobs?: JobPost[];
@@ -112,40 +107,40 @@ export default function CoachPage() {
   const [focusTopic, setFocusTopic] = useState("");
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [error, setError] = useState("");
 
   const activeSession = useMemo(
-    () => sessions.find((session) => session.id === activeSessionId) || null,
+    () =>
+      sessions.find((session) => session.session_id === activeSessionId) || null,
     [activeSessionId, sessions]
   );
 
-  const storageKey = userId ? `careercat_coach_sessions_${userId}` : "";
-
-  useEffect(() => {
+  const loadCoachSessions = useCallback(async () => {
     if (!userId) return;
 
-    const raw = window.localStorage.getItem(`careercat_coach_sessions_${userId}`);
-    if (!raw) {
-      setSessions([]);
-      setActiveSessionId("");
-      return;
-    }
-
     try {
-      const parsed = JSON.parse(raw) as CoachSession[];
-      setSessions(parsed);
-      setActiveSessionId(parsed[0]?.id || "");
-    } catch {
-      window.localStorage.removeItem(`careercat_coach_sessions_${userId}`);
-      setSessions([]);
-      setActiveSessionId("");
+      setSessionsLoading(true);
+      const data = await fetchCoachSessions(userId);
+      let nextSessions = data.sessions || [];
+
+      if (nextSessions.length === 0) {
+        nextSessions = await migrateLocalCoachSessions(userId);
+      }
+
+      setSessions(nextSessions);
+      setActiveSessionId(nextSessions[0]?.session_id || "");
+    } catch (loadError) {
+      console.error(loadError);
+      setError("Coach history could not be loaded from your account.");
+    } finally {
+      setSessionsLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
-    if (!storageKey) return;
-    window.localStorage.setItem(storageKey, JSON.stringify(sessions));
-  }, [sessions, storageKey]);
+    loadCoachSessions();
+  }, [loadCoachSessions]);
 
   useEffect(() => {
     const raw = window.localStorage.getItem("careercat_last_agent_decision");
@@ -192,14 +187,23 @@ export default function CoachPage() {
     loadJobs();
   }, [loadJobs]);
 
-  const saveSession = (nextSession: CoachSession) => {
+  const saveSessionLocally = (nextSession: CoachSession) => {
     setSessions((currentSessions) => {
       const withoutCurrent = currentSessions.filter(
-        (session) => session.id !== nextSession.id
+        (session) => session.session_id !== nextSession.session_id
       );
       return [nextSession, ...withoutCurrent];
     });
-    setActiveSessionId(nextSession.id);
+    setActiveSessionId(nextSession.session_id);
+  };
+
+  const persistSession = async (nextSession: CoachSession) => {
+    try {
+      await saveCoachSession(nextSession);
+    } catch (saveError) {
+      console.error(saveError);
+      setError("Coach history could not be saved to your account.");
+    }
   };
 
   const startSession = async () => {
@@ -232,7 +236,8 @@ export default function CoachPage() {
     );
 
     const nextSession: CoachSession = {
-      id: crypto.randomUUID(),
+      user_id: userId,
+      session_id: crypto.randomUUID(),
       title,
       mode,
       subtype: mode === "mock_interview" ? subtype : undefined,
@@ -243,7 +248,8 @@ export default function CoachPage() {
       updated_at: now,
     };
 
-    saveSession(nextSession);
+    saveSessionLocally(nextSession);
+    await persistSession(nextSession);
     await requestCoachReply(nextSession);
   };
 
@@ -272,7 +278,8 @@ export default function CoachPage() {
         updated_at: new Date().toISOString(),
       };
 
-      saveSession(updatedSession);
+      saveSessionLocally(updatedSession);
+      await persistSession(updatedSession);
     } catch (chatError) {
       console.error(chatError);
       setError("Coach failed to respond. Please try again.");
@@ -294,20 +301,31 @@ export default function CoachPage() {
     };
 
     setDraft("");
-    saveSession(updatedSession);
+    saveSessionLocally(updatedSession);
+    await persistSession(updatedSession);
     await requestCoachReply(updatedSession);
   };
 
-  const deleteSession = (sessionId: string) => {
+  const deleteSession = async (sessionId: string) => {
+    if (!userId) return;
+
     setSessions((currentSessions) => {
       const nextSessions = currentSessions.filter(
-        (session) => session.id !== sessionId
+        (session) => session.session_id !== sessionId
       );
       if (activeSessionId === sessionId) {
-        setActiveSessionId(nextSessions[0]?.id || "");
+        setActiveSessionId(nextSessions[0]?.session_id || "");
       }
       return nextSessions;
     });
+
+    try {
+      await deleteCoachSession(userId, sessionId);
+    } catch (deleteError) {
+      console.error(deleteError);
+      setError("Coach history could not be deleted from your account.");
+      loadCoachSessions();
+    }
   };
 
   return (
@@ -330,16 +348,18 @@ export default function CoachPage() {
           <div className="mt-4 space-y-2">
             {sessions.length === 0 ? (
               <p className="text-sm leading-6 text-slate-400">
-                Past chats will appear here on this browser.
+                {sessionsLoading
+                  ? "Loading coach history..."
+                  : "Past chats will appear here across your devices."}
               </p>
             ) : (
               sessions.map((session) => (
                 <button
                   type="button"
-                  key={session.id}
-                  onClick={() => setActiveSessionId(session.id)}
+                  key={session.session_id}
+                  onClick={() => setActiveSessionId(session.session_id)}
                   className={`w-full rounded-lg border p-3 text-left transition ${
-                    activeSessionId === session.id
+                    activeSessionId === session.session_id
                       ? "border-[#FFB238]/50 bg-[#FFB238]/10"
                       : "border-white/10 bg-white/5 hover:bg-white/10"
                   }`}
@@ -478,7 +498,7 @@ export default function CoachPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => deleteSession(activeSession.id)}
+                    onClick={() => deleteSession(activeSession.session_id)}
                     className="rounded-lg border border-red-300/40 px-3 py-2 text-sm text-red-100 hover:bg-red-500/10"
                   >
                     Delete Chat
@@ -546,6 +566,65 @@ function buildOpeningMessage(
   }
 
   return `Start written assessment training for ${focusTopic}. Teach the key concept, give me a practice problem, and coach me through my answer.`;
+}
+
+async function migrateLocalCoachSessions(userId: string) {
+  const storageKey = `careercat_coach_sessions_${userId}`;
+  const raw = window.localStorage.getItem(storageKey);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as Array<
+      Partial<CoachSession> & { id?: string }
+    >;
+
+    if (!Array.isArray(parsed)) return [];
+
+    const sessions = parsed
+      .map((session) => normalizeCoachSession(userId, session))
+      .filter((session): session is CoachSession => Boolean(session));
+
+    await Promise.all(sessions.map((session) => saveCoachSession(session)));
+    window.localStorage.removeItem(storageKey);
+
+    return sessions.sort((first, second) =>
+      (second.updated_at || second.created_at || "").localeCompare(
+        first.updated_at || first.created_at || ""
+      )
+    );
+  } catch (migrationError) {
+    console.error(migrationError);
+    return [];
+  }
+}
+
+function normalizeCoachSession(
+  userId: string,
+  session: Partial<CoachSession> & { id?: string }
+): CoachSession | null {
+  if (!session.title || !session.mode) return null;
+
+  const now = new Date().toISOString();
+  const messages = Array.isArray(session.messages)
+    ? session.messages.filter(
+        (message): message is CoachMessage =>
+          (message.role === "user" || message.role === "assistant") &&
+          typeof message.content === "string"
+      )
+    : [];
+
+  return {
+    user_id: userId,
+    session_id: session.session_id || session.id || crypto.randomUUID(),
+    title: session.title,
+    mode: session.mode,
+    subtype: session.subtype,
+    job_id: session.job_id,
+    focus_topic: session.focus_topic,
+    messages,
+    created_at: session.created_at || now,
+    updated_at: session.updated_at || session.created_at || now,
+  };
 }
 
 function ModeCard({

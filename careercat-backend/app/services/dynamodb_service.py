@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from app.config import (
     AWS_REGION,
     DYNAMODB_AGENT_RUNS_TABLE,
+    DYNAMODB_COACH_SESSIONS_TABLE,
     DYNAMODB_USER_PROFILES_TABLE,
     DYNAMODB_JOB_POSTS_TABLE,
 )
@@ -14,6 +15,7 @@ dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 user_profiles_table = dynamodb.Table(DYNAMODB_USER_PROFILES_TABLE)
 job_posts_table = dynamodb.Table(DYNAMODB_JOB_POSTS_TABLE)
 agent_runs_table = dynamodb.Table(DYNAMODB_AGENT_RUNS_TABLE)
+coach_sessions_table = dynamodb.Table(DYNAMODB_COACH_SESSIONS_TABLE)
 
 
 def _utc_now_iso() -> str:
@@ -132,3 +134,62 @@ def get_agent_runs_for_user(user_id: str, limit: int = 50):
         Limit=limit,
     )
     return response.get("Items", [])
+
+
+def save_coach_session(session_data: dict):
+    existing = get_coach_session_by_id(
+        session_data["user_id"],
+        session_data["session_id"],
+    )
+
+    item = {
+        **session_data,
+        "updated_at": _utc_now_iso(),
+    }
+
+    if existing:
+        item["created_at"] = existing.get(
+            "created_at",
+            session_data.get("created_at") or _utc_now_iso(),
+        )
+    else:
+        item["created_at"] = session_data.get("created_at") or _utc_now_iso()
+
+    coach_sessions_table.put_item(Item=item)
+    return item
+
+
+def get_coach_sessions_for_user(user_id: str):
+    response = coach_sessions_table.query(
+        KeyConditionExpression=Key("user_id").eq(user_id)
+    )
+    sessions = response.get("Items", [])
+    return sorted(
+        sessions,
+        key=lambda session: session.get("updated_at") or session.get("created_at") or "",
+        reverse=True,
+    )
+
+
+def get_coach_session_by_id(user_id: str, session_id: str):
+    response = coach_sessions_table.get_item(
+        Key={
+            "user_id": user_id,
+            "session_id": session_id,
+        }
+    )
+    return response.get("Item")
+
+
+def delete_coach_session(user_id: str, session_id: str):
+    existing = get_coach_session_by_id(user_id, session_id)
+    if not existing:
+        return False
+
+    coach_sessions_table.delete_item(
+        Key={
+            "user_id": user_id,
+            "session_id": session_id,
+        }
+    )
+    return True

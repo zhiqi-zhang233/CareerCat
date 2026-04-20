@@ -154,6 +154,19 @@ export type CoachMessage = {
   content: string;
 };
 
+export type CoachSession = {
+  user_id: string;
+  session_id: string;
+  title: string;
+  mode: CoachMode;
+  subtype?: string;
+  job_id?: string;
+  focus_topic?: string;
+  messages: CoachMessage[];
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type CoachChatRequest = {
   user_id: string;
   mode: CoachMode;

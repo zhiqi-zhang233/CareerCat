@@ -2,12 +2,82 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from app.auth import get_current_user_id, resolve_user_id
-from app.schemas.coach import CoachChatRequest, CoachChatResponse
-from app.services.dynamodb_service import get_job_post_by_id, get_user_profile
+from app.schemas.coach import (
+    CoachChatRequest,
+    CoachChatResponse,
+    CoachSessionResponse,
+    CoachSessionsResponse,
+    CoachSessionUpsertRequest,
+)
+from app.services.dynamodb_service import (
+    delete_coach_session,
+    get_coach_sessions_for_user,
+    get_job_post_by_id,
+    get_user_profile,
+    save_coach_session,
+)
 from app.services.interview_coach_service import generate_coach_reply, generate_interview_prep
 from app.services.observability_service import record_agent_run, summarize_text
 
 router = APIRouter(prefix="/coach", tags=["coach"])
+
+
+@router.get("/sessions/{user_id}", response_model=CoachSessionsResponse)
+def get_coach_sessions(
+    user_id: str,
+    auth_user_id: str | None = Depends(get_current_user_id),
+):
+    resolved_user_id = resolve_user_id(user_id, auth_user_id)
+    sessions = get_coach_sessions_for_user(resolved_user_id)
+
+    return {
+        "user_id": resolved_user_id,
+        "sessions": sessions,
+    }
+
+
+@router.put("/sessions/{user_id}/{session_id}", response_model=CoachSessionResponse)
+def upsert_coach_session(
+    user_id: str,
+    session_id: str,
+    payload: CoachSessionUpsertRequest,
+    auth_user_id: str | None = Depends(get_current_user_id),
+):
+    resolved_user_id = resolve_user_id(user_id, auth_user_id)
+
+    if payload.user_id and payload.user_id != resolved_user_id:
+        raise HTTPException(status_code=403, detail="Cannot save another user's coach session.")
+
+    if payload.session_id != session_id:
+        raise HTTPException(status_code=400, detail="Session id mismatch.")
+
+    session = save_coach_session(
+        {
+            **payload.model_dump(),
+            "user_id": resolved_user_id,
+            "session_id": session_id,
+        }
+    )
+
+    return {
+        "message": "Coach session saved successfully",
+        "session": session,
+    }
+
+
+@router.delete("/sessions/{user_id}/{session_id}")
+def delete_coach_session_for_user(
+    user_id: str,
+    session_id: str,
+    auth_user_id: str | None = Depends(get_current_user_id),
+):
+    resolved_user_id = resolve_user_id(user_id, auth_user_id)
+    deleted = delete_coach_session(resolved_user_id, session_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Coach session not found.")
+
+    return {"message": "Coach session deleted successfully"}
 
 
 @router.get("/{user_id}/{job_id}")

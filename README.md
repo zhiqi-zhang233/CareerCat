@@ -103,6 +103,7 @@ BEDROCK_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
 DYNAMODB_USER_PROFILES_TABLE=UserProfiles
 DYNAMODB_JOB_POSTS_TABLE=JobPosts
 DYNAMODB_AGENT_RUNS_TABLE=AgentRuns
+DYNAMODB_COACH_SESSIONS_TABLE=CoachSessions
 
 ADZUNA_APP_ID=your-adzuna-app-id
 ADZUNA_APP_KEY=your-adzuna-app-key
@@ -206,15 +207,16 @@ http://localhost:3000
 
 ### DynamoDB Tables
 
-CareerCat expects three DynamoDB tables:
+CareerCat expects four DynamoDB tables:
 
 ```text
 UserProfiles
 JobPosts
 AgentRuns
+CoachSessions
 ```
 
-The code reads the exact names from environment variables, so the table names can be changed as long as the environment variables are updated. The current implementation stores user profile records, saved job records, and agent observability records in DynamoDB.
+The code reads the exact names from environment variables, so the table names can be changed as long as the environment variables are updated. The current implementation stores user profile records, saved job records, agent observability records, and cross-device coach chat history in DynamoDB.
 
 ### Useful Developer Commands
 
@@ -536,6 +538,7 @@ BEDROCK_MODEL_ID=your-bedrock-model-id
 DYNAMODB_USER_PROFILES_TABLE=UserProfiles
 DYNAMODB_JOB_POSTS_TABLE=JobPosts
 DYNAMODB_AGENT_RUNS_TABLE=AgentRuns
+DYNAMODB_COACH_SESSIONS_TABLE=CoachSessions
 ADZUNA_APP_ID=your-adzuna-app-id
 ADZUNA_APP_KEY=your-adzuna-app-key
 ADZUNA_COUNTRY=us
@@ -571,7 +574,7 @@ For a course demo, `DEMO_AUTH_CONFIRM_ENABLED` can be temporarily set to `true` 
 
 ### Observability and Metrics
 
-CareerCat records workflow traces in the `AgentRuns` DynamoDB table. The observability page summarizes:
+CareerCat records workflow traces in the `AgentRuns` DynamoDB table. Coach conversations are stored separately in the `CoachSessions` table so history follows the user's account across browsers and devices. The observability page summarizes:
 
 - Recent agent/tool runs.
 - Workflow names and selected tools.
