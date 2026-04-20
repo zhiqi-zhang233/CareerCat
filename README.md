@@ -6,6 +6,16 @@ CareerCat is an agentic AI job search assistant that helps users turn a messy, m
 
 The main pain point CareerCat addresses is that job seekers often have to manually copy jobs, track applications in spreadsheets, interpret resume-job fit, and prepare for interviews across disconnected tools. CareerCat brings those steps into one account-based web app where an LLM can decide which workflow or tool should handle the user's request.
 
+```mermaid
+flowchart LR
+    User["User / Evaluator"] --> Frontend["Next.js Frontend"]
+    Frontend --> Cognito["Amazon Cognito"]
+    Frontend --> Backend["FastAPI Backend"]
+    Backend --> DynamoDB["Amazon DynamoDB"]
+    Backend --> Bedrock["Amazon Bedrock"]
+    Backend --> Adzuna["Adzuna API"]
+```
+
 ## Features
 
 - **Account-based workspaces:** Users can create their own CareerCat account with Amazon Cognito. Resume profiles, saved jobs, statuses, and preferences are stored per user.
