@@ -17,6 +17,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import Header from "@/components/Header";
 import { fetchUserJobs, sendCoachChat } from "@/lib/api";
 import type {
@@ -593,10 +594,12 @@ function MessageBubble({ message }: { message: CoachMessage }) {
 }
 
 type MarkdownBlock =
-  | { type: "heading"; text: string }
+  | { type: "heading"; level: number; text: string }
   | { type: "paragraph"; text: string }
   | { type: "ordered"; items: string[] }
   | { type: "unordered"; items: string[] }
+  | { type: "quote"; text: string }
+  | { type: "rule" }
   | { type: "code"; language: string; text: string };
 
 function CoachMarkdown({ content }: { content: string }) {
@@ -607,12 +610,33 @@ function CoachMarkdown({ content }: { content: string }) {
       {blocks.map((block, blockIndex) => {
         if (block.type === "heading") {
           return (
-            <h3
+            <HeadingTag
               key={`${block.type}-${blockIndex}`}
-              className="pt-1 font-semibold text-[#FFB238]"
+              level={block.level}
+              className={headingClassName(block.level)}
             >
               {renderInline(block.text)}
-            </h3>
+            </HeadingTag>
+          );
+        }
+
+        if (block.type === "rule") {
+          return (
+            <hr
+              key={`${block.type}-${blockIndex}`}
+              className="my-4 border-t border-white/15"
+            />
+          );
+        }
+
+        if (block.type === "quote") {
+          return (
+            <blockquote
+              key={`${block.type}-${blockIndex}`}
+              className="border-l-2 border-[#FFB238]/60 pl-4 text-slate-300"
+            >
+              {renderInline(block.text)}
+            </blockquote>
           );
         }
 
@@ -717,6 +741,13 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
         return;
       }
 
+      if (isHorizontalRule(line)) {
+        flushList();
+        flushParagraph();
+        blocks.push({ type: "rule" });
+        return;
+      }
+
       const codeFenceMatch = line.match(/^```([A-Za-z0-9_-]*)\s*(.*)$/);
       if (codeFenceMatch) {
         flushList();
@@ -742,22 +773,31 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
         return;
       }
 
-      const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
+      const heading = parseHeading(line);
+      if (heading) {
+        flushList();
+        flushParagraph();
+        blocks.push(heading);
+        return;
+      }
+
+      const quoteMatch = line.match(/^>\s*(.*)$/);
+      if (quoteMatch) {
+        flushList();
+        flushParagraph();
+        blocks.push({ type: "quote", text: quoteMatch[1] });
+        return;
+      }
+
+      const orderedMatch = line.match(/^\d+[\.)]\s+(.*)$/);
       if (orderedMatch) {
         pushListItem("ordered", orderedMatch[1]);
         return;
       }
 
-      const unorderedMatch = line.match(/^[-*]\s+(.*)$/);
+      const unorderedMatch = line.match(/^(?:[-*+]|\u2022)\s+(.*)$/);
       if (unorderedMatch) {
-        pushListItem("unordered", unorderedMatch[1]);
-        return;
-      }
-
-      if (isMarkdownHeading(line)) {
-        flushList();
-        flushParagraph();
-        blocks.push({ type: "heading", text: line });
+        pushListItem("unordered", cleanListItem(unorderedMatch[1]));
         return;
       }
 
@@ -772,8 +812,65 @@ function parseMarkdownBlocks(content: string): MarkdownBlock[] {
   return blocks.length ? blocks : [{ type: "paragraph", text: content }];
 }
 
-function isMarkdownHeading(line: string) {
-  return /^\*\*[^*]+:?\*\*$/.test(line) && line.length <= 80;
+function isHorizontalRule(line: string) {
+  return /^([-*_])(?:\s*\1){2,}\s*$/.test(line);
+}
+
+function parseHeading(line: string): Extract<MarkdownBlock, { type: "heading" }> | null {
+  const atxHeading = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
+  if (atxHeading) {
+    return {
+      type: "heading",
+      level: atxHeading[1].length,
+      text: atxHeading[2].trim(),
+    };
+  }
+
+  if (/^\*\*[^*]+:?\*\*$/.test(line) && line.length <= 80) {
+    return {
+      type: "heading",
+      level: 3,
+      text: line.slice(2, -2),
+    };
+  }
+
+  return null;
+}
+
+function cleanListItem(text: string) {
+  return text.replace(/^\[[ xX]\]\s+/, "");
+}
+
+function HeadingTag({
+  level,
+  className,
+  children,
+}: {
+  level: number;
+  className: string;
+  children: ReactNode;
+}) {
+  if (level <= 1) {
+    return <h2 className={className}>{children}</h2>;
+  }
+
+  if (level === 2) {
+    return <h3 className={className}>{children}</h3>;
+  }
+
+  return <h4 className={className}>{children}</h4>;
+}
+
+function headingClassName(level: number) {
+  if (level <= 1) {
+    return "pt-2 text-lg font-semibold text-[#FFB238]";
+  }
+
+  if (level === 2) {
+    return "pt-2 text-base font-semibold text-[#FFB238]";
+  }
+
+  return "pt-1 text-sm font-semibold text-[#FFB238]";
 }
 
 function CodeBlock({
