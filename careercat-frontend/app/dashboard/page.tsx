@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
-import { fetchUserJobs, updateJobPost } from "@/lib/api";
+import { deleteJobPost, fetchUserJobs, updateJobPost } from "@/lib/api";
 import type { JobApplicationStatus, JobPost, JobUpdatePayload } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
 
@@ -46,16 +46,16 @@ const STATUS_OPTIONS: Array<{
 
 type SortKey = "created_at" | "posting_date" | "application_date" | "title";
 type SortDirection = "desc" | "asc";
-
-type JobsResponse = {
-  jobs?: JobPost[];
-};
+type JobsResponse = { jobs?: JobPost[] };
+type JobEditorState = Record<string, JobPost>;
 
 export default function DashboardPage() {
   const userId = useLocalUserId();
   const [jobs, setJobs] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(false);
-  const [updatingJobId, setUpdatingJobId] = useState("");
+  const [busyJobId, setBusyJobId] = useState("");
+  const [editingJobId, setEditingJobId] = useState("");
+  const [drafts, setDrafts] = useState<JobEditorState>({});
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<JobApplicationStatus | "all">("all");
@@ -117,8 +117,7 @@ export default function DashboardPage() {
           .toLowerCase();
 
         const matchesSearch = !query || searchableText.includes(query);
-        const matchesStatus =
-          statusFilter === "all" || job.status === statusFilter;
+        const matchesStatus = statusFilter === "all" || job.status === statusFilter;
         const matchesLocation =
           !locationQuery || job.location.toLowerCase().includes(locationQuery);
         const matchesSalary =
@@ -152,9 +151,7 @@ export default function DashboardPage() {
   const statusCounts = useMemo(() => {
     return STATUS_OPTIONS.reduce<Record<JobApplicationStatus, number>>(
       (counts, option) => {
-        counts[option.value] = jobs.filter(
-          (job) => job.status === option.value
-        ).length;
+        counts[option.value] = jobs.filter((job) => job.status === option.value).length;
         return counts;
       },
       {
@@ -168,10 +165,7 @@ export default function DashboardPage() {
     );
   }, [jobs]);
 
-  const handleJobUpdate = async (
-    job: JobPost,
-    updates: JobUpdatePayload
-  ) => {
+  const handleQuickUpdate = async (job: JobPost, updates: JobUpdatePayload) => {
     if (!userId) return;
 
     const nextUpdates = { ...updates };
@@ -192,7 +186,7 @@ export default function DashboardPage() {
     );
 
     try {
-      setUpdatingJobId(job.job_id);
+      setBusyJobId(job.job_id);
       setError("");
       const data = await updateJobPost(userId, job.job_id, nextUpdates);
       setJobs((currentJobs) =>
@@ -205,7 +199,108 @@ export default function DashboardPage() {
       setError("Failed to update this job. Reloading saved data.");
       await loadJobs();
     } finally {
-      setUpdatingJobId("");
+      setBusyJobId("");
+    }
+  };
+
+  const beginEdit = (job: JobPost) => {
+    setEditingJobId(job.job_id);
+    setDrafts((current) => ({
+      ...current,
+      [job.job_id]: normalizeJob(job),
+    }));
+  };
+
+  const cancelEdit = (jobId: string) => {
+    setEditingJobId("");
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[jobId];
+      return next;
+    });
+  };
+
+  const updateDraft = (
+    jobId: string,
+    updater: (draft: JobPost) => JobPost
+  ) => {
+    setDrafts((current) => {
+      const existing = current[jobId];
+      if (!existing) return current;
+      return {
+        ...current,
+        [jobId]: normalizeJob(updater(existing)),
+      };
+    });
+  };
+
+  const saveEditedJob = async (jobId: string) => {
+    if (!userId) return;
+    const draft = drafts[jobId];
+    if (!draft) return;
+
+    try {
+      setBusyJobId(jobId);
+      setError("");
+      const payload: JobUpdatePayload = {
+        company: draft.company,
+        title: draft.title,
+        location: draft.location,
+        work_mode: draft.work_mode,
+        employment_type: draft.employment_type,
+        seniority: draft.seniority,
+        visa_sponsorship: draft.visa_sponsorship,
+        salary_range: draft.salary_range,
+        posting_date: draft.posting_date,
+        required_skills: draft.required_skills,
+        preferred_skills: draft.preferred_skills,
+        requirements: draft.requirements,
+        responsibilities: draft.responsibilities,
+        summary: draft.summary,
+        raw_job_text: draft.raw_job_text,
+        status: draft.status,
+        application_date: draft.application_date,
+        notes: draft.notes,
+      };
+      const data = await updateJobPost(userId, jobId, payload);
+      const normalized = normalizeJob(data.job);
+      setJobs((currentJobs) =>
+        currentJobs.map((currentJob) =>
+          currentJob.job_id === jobId ? normalized : currentJob
+        )
+      );
+      cancelEdit(jobId);
+    } catch (saveError) {
+      console.error(saveError);
+      setError("Failed to save your edits.");
+    } finally {
+      setBusyJobId("");
+    }
+  };
+
+  const handleDeleteJob = async (job: JobPost) => {
+    if (!userId) return;
+    const confirmed = window.confirm(
+      `Delete ${job.title} at ${job.company || "this company"} from your dashboard?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setBusyJobId(job.job_id);
+      setError("");
+      await deleteJobPost(userId, job.job_id);
+      setJobs((currentJobs) =>
+        currentJobs.filter((currentJob) => currentJob.job_id !== job.job_id)
+      );
+      if (editingJobId === job.job_id) {
+        cancelEdit(job.job_id);
+      }
+    } catch (deleteError) {
+      console.error(deleteError);
+      setError("Failed to delete this job.");
+    } finally {
+      setBusyJobId("");
     }
   };
 
@@ -216,15 +311,14 @@ export default function DashboardPage() {
       <section className="mx-auto max-w-7xl px-6 py-16">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-[#FFB238]">
-              Application Tracker
-            </p>
+            <p className="text-sm font-medium text-[#FFB238]">Application Tracker</p>
             <h1 className="mt-3 text-4xl font-bold text-[#FFB238]">
               Jobs Dashboard
             </h1>
             <p className="mt-4 max-w-2xl text-slate-300">
-              Review structured job posts, filter by status, location, salary,
-              and skills, then update each application stage as you move.
+              Review structured job posts, update application progress, edit any
+              parsed field, and delete records that should not stay in your
+              account.
             </p>
           </div>
 
@@ -255,9 +349,7 @@ export default function DashboardPage() {
               className={`rounded-lg border p-4 text-left transition hover:-translate-y-0.5 ${option.tone}`}
             >
               <p className="text-xs uppercase opacity-80">{option.label}</p>
-              <p className="mt-2 text-3xl font-bold">
-                {statusCounts[option.value]}
-              </p>
+              <p className="mt-2 text-3xl font-bold">{statusCounts[option.value]}</p>
             </button>
           ))}
         </div>
@@ -349,9 +441,7 @@ export default function DashboardPage() {
               <select
                 className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
                 value={sortDirection}
-                onChange={(event) =>
-                  setSortDirection(event.target.value as SortDirection)
-                }
+                onChange={(event) => setSortDirection(event.target.value as SortDirection)}
               >
                 <option value="desc">Newest / Z-A</option>
                 <option value="asc">Oldest / A-Z</option>
@@ -389,134 +479,383 @@ export default function DashboardPage() {
 
         {filteredJobs.length === 0 ? (
           <section className="mt-8 rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-            <h2 className="text-xl font-semibold text-[#FFB238]">
-              No jobs found
-            </h2>
+            <h2 className="text-xl font-semibold text-[#FFB238]">No jobs found</h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-300">
-              Import a job post or clear your filters to see saved
-              opportunities.
+              Import a job post or clear your filters to see saved opportunities.
             </p>
           </section>
         ) : (
           <section className="mt-8 grid gap-5">
-            {filteredJobs.map((job) => (
-              <article
-                key={job.job_id}
-                className="rounded-lg border border-white/10 bg-white/5 p-6"
-              >
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <StatusBadge status={job.status} />
-                      <span className="text-xs text-slate-400">
-                        Imported {formatDate(job.created_at)}
-                      </span>
-                      {updatingJobId === job.job_id && (
-                        <span className="text-xs text-[#FFB238]">Saving...</span>
+            {filteredJobs.map((job) => {
+              const isEditing = editingJobId === job.job_id;
+              const viewJob = isEditing ? drafts[job.job_id] || job : job;
+
+              return (
+                <article
+                  key={job.job_id}
+                  className="rounded-lg border border-white/10 bg-white/5 p-6"
+                >
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <StatusBadge status={viewJob.status} />
+                        <span className="text-xs text-slate-400">
+                          Imported {formatDate(viewJob.created_at)}
+                        </span>
+                        {busyJobId === job.job_id && (
+                          <span className="text-xs text-[#FFB238]">Saving...</span>
+                        )}
+                      </div>
+
+                      {isEditing ? (
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                          <TextField
+                            label="Job Title"
+                            value={viewJob.title}
+                            onChange={(value) =>
+                              updateDraft(job.job_id, (draft) => ({ ...draft, title: value }))
+                            }
+                          />
+                          <TextField
+                            label="Company"
+                            value={viewJob.company}
+                            onChange={(value) =>
+                              updateDraft(job.job_id, (draft) => ({ ...draft, company: value }))
+                            }
+                          />
+                          <TextField
+                            label="Location"
+                            value={viewJob.location}
+                            onChange={(value) =>
+                              updateDraft(job.job_id, (draft) => ({ ...draft, location: value }))
+                            }
+                          />
+                          <TextField
+                            label="Work Mode"
+                            value={viewJob.work_mode}
+                            onChange={(value) =>
+                              updateDraft(job.job_id, (draft) => ({ ...draft, work_mode: value }))
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <h2 className="mt-4 text-2xl font-bold text-white">{viewJob.title}</h2>
+                          <p className="mt-2 text-sm text-slate-300">
+                            {viewJob.company || "Company not listed"} ·{" "}
+                            {viewJob.location || "Location unknown"} · {viewJob.work_mode}
+                          </p>
+                        </>
+                      )}
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {viewJob.required_skills.slice(0, 12).map((skill) => (
+                          <span
+                            key={skill}
+                            className="rounded-full bg-[#FFB238]/15 px-3 py-1 text-xs text-[#FFB238]"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[440px]">
+                      <label className="text-sm text-slate-300">
+                        Status
+                        {isEditing ? (
+                          <select
+                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            value={viewJob.status}
+                            onChange={(event) =>
+                              updateDraft(job.job_id, (draft) => ({
+                                ...draft,
+                                status: event.target.value as JobApplicationStatus,
+                              }))
+                            }
+                          >
+                            {STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <select
+                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            value={viewJob.status}
+                            onChange={(event) =>
+                              handleQuickUpdate(job, {
+                                status: event.target.value as JobApplicationStatus,
+                              })
+                            }
+                          >
+                            {STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
+
+                      <label className="text-sm text-slate-300">
+                        Application Date
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            value={normalizeDateInput(viewJob.application_date)}
+                            onChange={(event) =>
+                              updateDraft(job.job_id, (draft) => ({
+                                ...draft,
+                                application_date: event.target.value,
+                              }))
+                            }
+                          />
+                        ) : (
+                          <input
+                            type="date"
+                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            value={normalizeDateInput(viewJob.application_date)}
+                            onChange={(event) =>
+                              handleQuickUpdate(job, {
+                                application_date: event.target.value,
+                              })
+                            }
+                          />
+                        )}
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => saveEditedJob(job.job_id)}
+                          disabled={busyJobId === job.job_id}
+                          className="rounded-lg bg-[#FFB238] px-4 py-2 text-sm font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Save Changes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => cancelEdit(job.job_id)}
+                          className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => beginEdit(job)}
+                        className="rounded-lg border border-[#FFB238]/40 px-4 py-2 text-sm font-semibold text-[#FFB238] transition hover:bg-white/10"
+                      >
+                        Edit Job
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteJob(job)}
+                      disabled={busyJobId === job.job_id}
+                      className="rounded-lg border border-red-300/30 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Delete Job
+                    </button>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-4">
+                    {isEditing ? (
+                      <>
+                        <TextField
+                          label="Salary"
+                          value={viewJob.salary_range}
+                          onChange={(value) =>
+                            updateDraft(job.job_id, (draft) => ({
+                              ...draft,
+                              salary_range: value,
+                            }))
+                          }
+                        />
+                        <TextField
+                          label="Posting Date"
+                          value={viewJob.posting_date}
+                          onChange={(value) =>
+                            updateDraft(job.job_id, (draft) => ({
+                              ...draft,
+                              posting_date: value,
+                            }))
+                          }
+                        />
+                        <TextField
+                          label="Employment Type"
+                          value={viewJob.employment_type}
+                          onChange={(value) =>
+                            updateDraft(job.job_id, (draft) => ({
+                              ...draft,
+                              employment_type: value,
+                            }))
+                          }
+                        />
+                        <TextField
+                          label="Sponsorship"
+                          value={viewJob.visa_sponsorship}
+                          onChange={(value) =>
+                            updateDraft(job.job_id, (draft) => ({
+                              ...draft,
+                              visa_sponsorship: value,
+                            }))
+                          }
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Meta label="Salary" value={viewJob.salary_range || "Unknown"} />
+                        <Meta label="Posting Date" value={viewJob.posting_date || "Unknown"} />
+                        <Meta label="Type" value={viewJob.employment_type} />
+                        <Meta label="Sponsorship" value={viewJob.visa_sponsorship} />
+                      </>
+                    )}
+                  </div>
+
+                  {isEditing ? (
+                    <div className="mt-5 space-y-4">
+                      <ListEditor
+                        label="Required Skills"
+                        value={viewJob.required_skills}
+                        onChange={(value) =>
+                          updateDraft(job.job_id, (draft) => ({
+                            ...draft,
+                            required_skills: value,
+                          }))
+                        }
+                        placeholder="Python, SQL, Tableau"
+                      />
+                      <ListEditor
+                        label="Preferred Skills"
+                        value={viewJob.preferred_skills}
+                        onChange={(value) =>
+                          updateDraft(job.job_id, (draft) => ({
+                            ...draft,
+                            preferred_skills: value,
+                          }))
+                        }
+                        placeholder="dbt, Airflow, Snowflake"
+                      />
+                      <TextAreaField
+                        label="Summary"
+                        value={viewJob.summary}
+                        onChange={(value) =>
+                          updateDraft(job.job_id, (draft) => ({
+                            ...draft,
+                            summary: value,
+                          }))
+                        }
+                        rows={4}
+                      />
+                    </div>
+                  ) : (
+                    <p className="mt-5 text-sm leading-6 text-slate-300">{viewJob.summary}</p>
+                  )}
+
+                  <details className="mt-5">
+                    <summary className="cursor-pointer text-sm font-semibold text-[#FFB238]">
+                      {isEditing ? "Edit requirements, responsibilities, notes, and raw text" : "Requirements and notes"}
+                    </summary>
+
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                      {isEditing ? (
+                        <>
+                          <ListEditor
+                            label="Requirements"
+                            value={viewJob.requirements}
+                            onChange={(value) =>
+                              updateDraft(job.job_id, (draft) => ({
+                                ...draft,
+                                requirements: value,
+                              }))
+                            }
+                            placeholder="One requirement per line"
+                            multiline
+                          />
+                          <ListEditor
+                            label="Responsibilities"
+                            value={viewJob.responsibilities}
+                            onChange={(value) =>
+                              updateDraft(job.job_id, (draft) => ({
+                                ...draft,
+                                responsibilities: value,
+                              }))
+                            }
+                            placeholder="One responsibility per line"
+                            multiline
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <ListBlock title="Requirements" items={viewJob.requirements} />
+                          <ListBlock title="Responsibilities" items={viewJob.responsibilities} />
+                        </>
                       )}
                     </div>
 
-                    <h2 className="mt-4 text-2xl font-bold text-white">
-                      {job.title}
-                    </h2>
-                    <p className="mt-2 text-sm text-slate-300">
-                      {job.company || "Company not listed"} ·{" "}
-                      {job.location || "Location unknown"} · {job.work_mode}
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {job.required_skills.slice(0, 12).map((skill) => (
-                        <span
-                          key={skill}
-                          className="rounded-full bg-[#FFB238]/15 px-3 py-1 text-xs text-[#FFB238]"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[420px]">
-                    <label className="text-sm text-slate-300">
-                      Status
-                      <select
-                        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
-                        value={job.status}
-                        onChange={(event) =>
-                          handleJobUpdate(job, {
-                            status: event.target.value as JobApplicationStatus,
-                          })
-                        }
-                      >
-                        {STATUS_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                    <label className="mt-4 block text-sm text-slate-300">
+                      Notes
+                      {isEditing ? (
+                        <textarea
+                          className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                          rows={3}
+                          value={viewJob.notes}
+                          onChange={(event) =>
+                            updateDraft(job.job_id, (draft) => ({
+                              ...draft,
+                              notes: event.target.value,
+                            }))
+                          }
+                          placeholder="Add recruiter notes, links, or follow-up reminders..."
+                        />
+                      ) : (
+                        <textarea
+                          className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                          rows={3}
+                          value={viewJob.notes}
+                          onChange={(event) =>
+                            setJobs((currentJobs) =>
+                              currentJobs.map((currentJob) =>
+                                currentJob.job_id === job.job_id
+                                  ? { ...currentJob, notes: event.target.value }
+                                  : currentJob
+                              )
+                            )
+                          }
+                          onBlur={(event) =>
+                            handleQuickUpdate(job, { notes: event.target.value })
+                          }
+                          placeholder="Add recruiter notes, links, or follow-up reminders..."
+                        />
+                      )}
                     </label>
 
-                    <label className="text-sm text-slate-300">
-                      Application Date
-                      <input
-                        type="date"
-                        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
-                        value={normalizeDateInput(job.application_date)}
-                        onChange={(event) =>
-                          handleJobUpdate(job, {
-                            application_date: event.target.value,
-                          })
+                    {isEditing && (
+                      <TextAreaField
+                        label="Raw Job Text"
+                        value={viewJob.raw_job_text}
+                        onChange={(value) =>
+                          updateDraft(job.job_id, (draft) => ({
+                            ...draft,
+                            raw_job_text: value,
+                          }))
                         }
+                        rows={8}
                       />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-4 md:grid-cols-4">
-                  <Meta label="Salary" value={job.salary_range || "Unknown"} />
-                  <Meta label="Posting Date" value={job.posting_date || "Unknown"} />
-                  <Meta label="Type" value={job.employment_type} />
-                  <Meta label="Sponsorship" value={job.visa_sponsorship} />
-                </div>
-
-                <p className="mt-5 text-sm leading-6 text-slate-300">
-                  {job.summary}
-                </p>
-
-                <details className="mt-5">
-                  <summary className="cursor-pointer text-sm font-semibold text-[#FFB238]">
-                    Requirements and notes
-                  </summary>
-
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    <ListBlock title="Requirements" items={job.requirements} />
-                    <ListBlock title="Responsibilities" items={job.responsibilities} />
-                  </div>
-
-                  <label className="mt-4 block text-sm text-slate-300">
-                    Notes
-                    <textarea
-                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
-                      rows={3}
-                      value={job.notes}
-                      onChange={(event) =>
-                        setJobs((currentJobs) =>
-                          currentJobs.map((currentJob) =>
-                            currentJob.job_id === job.job_id
-                              ? { ...currentJob, notes: event.target.value }
-                              : currentJob
-                          )
-                        )
-                      }
-                      onBlur={(event) =>
-                        handleJobUpdate(job, { notes: event.target.value })
-                      }
-                      placeholder="Add recruiter notes, links, or follow-up reminders..."
-                    />
-                  </label>
-                </details>
-              </article>
-            ))}
+                    )}
+                  </details>
+                </article>
+              );
+            })}
           </section>
         )}
       </section>
@@ -629,5 +968,98 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
         </ul>
       )}
     </div>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="text-sm text-slate-300">
+      {label}
+      <input
+        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function TextAreaField({
+  label,
+  value,
+  onChange,
+  rows,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  rows: number;
+}) {
+  return (
+    <label className="block text-sm text-slate-300">
+      <span>{label}</span>
+      <textarea
+        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        rows={rows}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function ListEditor({
+  label,
+  value,
+  onChange,
+  placeholder,
+  multiline = false,
+}: {
+  label: string;
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder: string;
+  multiline?: boolean;
+}) {
+  const serialized = multiline ? value.join("\n") : value.join(", ");
+
+  const handleChange = (nextValue: string) => {
+    const items = multiline ? nextValue.split("\n") : nextValue.split(",");
+    onChange(items.map((item) => item.trim()).filter(Boolean));
+  };
+
+  if (multiline) {
+    return (
+      <label className="block text-sm text-slate-300">
+        {label}
+        <textarea
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+          rows={5}
+          value={serialized}
+          placeholder={placeholder}
+          onChange={(event) => handleChange(event.target.value)}
+        />
+      </label>
+    );
+  }
+
+  return (
+    <label className="block text-sm text-slate-300">
+      {label}
+      <input
+        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        value={serialized}
+        placeholder={placeholder}
+        onChange={(event) => handleChange(event.target.value)}
+      />
+    </label>
   );
 }

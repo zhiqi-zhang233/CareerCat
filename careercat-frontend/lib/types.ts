@@ -93,6 +93,21 @@ export type JobApplicationStatus =
   | "rejected";
 
 export type JobUpdatePayload = {
+  company?: string;
+  title?: string;
+  location?: string;
+  work_mode?: string;
+  employment_type?: string;
+  seniority?: string;
+  visa_sponsorship?: string;
+  salary_range?: string;
+  posting_date?: string;
+  required_skills?: string[];
+  preferred_skills?: string[];
+  requirements?: string[];
+  responsibilities?: string[];
+  summary?: string;
+  raw_job_text?: string;
   status?: JobApplicationStatus;
   application_date?: string;
   notes?: string;

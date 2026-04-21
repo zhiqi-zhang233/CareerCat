@@ -165,6 +165,64 @@ export async function importJobPost(jobData: {
   return response.json();
 }
 
+export async function parseJobPost(jobData: {
+  user_id: string;
+  raw_job_text: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/jobs/parse`, {
+    method: "POST",
+    headers: await buildHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(jobData),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to parse job post");
+  }
+
+  return response.json();
+}
+
+export async function createJobPost(jobData: {
+  user_id: string;
+  company: string;
+  title: string;
+  location: string;
+  work_mode: string;
+  employment_type: string;
+  seniority: string;
+  visa_sponsorship: string;
+  salary_range: string;
+  posting_date: string;
+  required_skills: string[];
+  preferred_skills: string[];
+  requirements: string[];
+  responsibilities: string[];
+  summary: string;
+  raw_job_text: string;
+  status?: JobUpdatePayload["status"];
+  application_date?: string;
+  notes?: string;
+  force_save?: boolean;
+}) {
+  const response = await fetch(`${API_BASE_URL}/jobs`, {
+    method: "POST",
+    headers: await buildHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(jobData),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to save job post");
+  }
+
+  return response.json();
+}
+
 export async function fetchUserJobs(userId: string) {
   const response = await fetch(`${API_BASE_URL}/jobs/${userId}`, {
     headers: await buildHeaders(),
@@ -192,6 +250,20 @@ export async function updateJobPost(
 
   if (!response.ok) {
     throw new Error("Failed to update job post");
+  }
+
+  return response.json();
+}
+
+export async function deleteJobPost(userId: string, jobId: string) {
+  const response = await fetch(`${API_BASE_URL}/jobs/${userId}/${jobId}`, {
+    method: "DELETE",
+    headers: await buildHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to delete job post");
   }
 
   return response.json();

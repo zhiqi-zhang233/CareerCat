@@ -117,6 +117,21 @@ def update_job_post(user_id: str, job_id: str, updates: dict):
     return item
 
 
+def delete_job_post(user_id: str, job_id: str):
+    existing = get_job_post_by_id(user_id, job_id)
+
+    if not existing:
+        return False
+
+    job_posts_table.delete_item(
+        Key={
+            "user_id": user_id,
+            "job_id": job_id,
+        }
+    )
+    return True
+
+
 def save_agent_run(run_data: dict):
     item = {
         **run_data,
