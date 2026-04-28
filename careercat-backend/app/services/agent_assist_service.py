@@ -173,10 +173,12 @@ def _normalize_decision(decision: dict):
         route=route,
         intent=normalized["intent"],
     )
-    current_stage_id = str(
-        decision.get("current_stage_id")
-        or _first_ready_stage_id(stages)
-        or (stages[0]["id"] if stages else "")
+    stage_ids = {stage["id"] for stage in stages}
+    requested_stage_id = str(decision.get("current_stage_id") or "")
+    current_stage_id = (
+        requested_stage_id
+        if requested_stage_id in stage_ids
+        else (_first_ready_stage_id(stages) or (stages[0]["id"] if stages else ""))
     )
 
     return {
@@ -352,7 +354,7 @@ def _normalize_stages(raw_stages, selected_tool: str, route: str, intent: str):
                     "output": str(stage.get("output") or "A usable result for the next stage."),
                 }
             )
-        if stages:
+        if len(stages) >= 4:
             return stages
 
     if intent == "job_discovery":
@@ -394,7 +396,8 @@ def _profile_stages():
     return [
         _stage("profile_parse", "Parse Resume", "Profile Agent", "/profile", "Upload or edit resume-derived profile fields.", [], "ready", True, "Structured profile."),
         _stage("profile_constraints", "Confirm Targets", "Goal Agent", "/profile", "Confirm target roles, locations, and sponsorship needs.", ["profile_parse"], "planned", True, "Job-search constraints."),
-        _stage("next_workflow", "Choose Next Workflow", "Goal Agent", "/", "Move to recommendations, job import, or coaching.", ["profile_constraints"], "planned", True, "Next workflow decision."),
+        _stage("profile_save", "Save Profile", "Profile Agent", "/profile", "Persist corrected resume details and preferences to the account.", ["profile_constraints"], "planned", True, "Saved profile."),
+        _stage("next_workflow", "Choose Next Workflow", "Goal Agent", "/", "Move to recommendations, job import, or coaching.", ["profile_save"], "planned", True, "Next workflow decision."),
     ]
 
 
@@ -435,7 +438,8 @@ def _dashboard_stages():
     return [
         _stage("review_pipeline", "Review Pipeline", "Tracker Agent", "/dashboard", "Filter saved jobs by status, date, skill, salary, and location.", [], "ready", True, "Prioritized job list."),
         _stage("update_records", "Update Records", "Tracker Agent", "/dashboard", "Edit job details, application dates, notes, and statuses.", ["review_pipeline"], "ready", True, "Current application data."),
-        _stage("prepare_next", "Prepare Next Action", "Coach Agent", "/coach", "Use the highest-priority saved job for gap analysis or practice.", ["update_records"], "planned", True, "Preparation workflow."),
+        _stage("choose_priority", "Choose Priority", "Fit Agent", "/dashboard", "Identify which applications need action first.", ["update_records"], "planned", True, "Priority list."),
+        _stage("prepare_next", "Prepare Next Action", "Coach Agent", "/coach", "Use the highest-priority saved job for gap analysis or practice.", ["choose_priority"], "planned", True, "Preparation workflow."),
     ]
 
 
@@ -443,6 +447,8 @@ def _guidance_stages():
     return [
         _stage("clarify_goal", "Clarify Goal", "Goal Agent", "/", "Identify whether the user wants profile setup, job search, import, tracking, or coaching.", [], "ready", True, "Clear workflow goal."),
         _stage("choose_workflow", "Choose Workflow", "Goal Agent", "/", "Route to the first useful page after the goal is clear.", ["clarify_goal"], "blocked", True, "Selected workflow."),
+        _stage("open_workspace", "Open Workspace", "Goal Agent", "/", "Send the user to the selected workflow page.", ["choose_workflow"], "blocked", True, "Next page."),
+        _stage("continue_task", "Continue Task", "Goal Agent", "/", "Use the selected page to continue the job-search task.", ["open_workspace"], "blocked", True, "Progress on the chosen workflow."),
     ]
 
 

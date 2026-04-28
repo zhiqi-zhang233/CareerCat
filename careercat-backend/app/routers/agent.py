@@ -12,7 +12,7 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 
 @router.post("/assist", response_model=AgentAssistResponse)
-def agent_assist(
+def workflow_agent(
     payload: AgentAssistRequest,
     auth_user_id: str | None = Depends(get_current_user_id),
 ):
@@ -29,7 +29,7 @@ def agent_assist(
     except Exception as exc:
         record_agent_run(
             user_id=user_id,
-            action_type="agent_assist",
+            action_type="workflow_agent",
             selected_tool="route_request",
             route=payload.current_page,
             input_summary=payload.message,
@@ -41,7 +41,7 @@ def agent_assist(
 
     record_agent_run(
         user_id=user_id,
-        action_type="agent_assist",
+        action_type="workflow_agent",
         selected_tool=decision["selected_tool"],
         route=decision["route"],
         input_summary=payload.message,
