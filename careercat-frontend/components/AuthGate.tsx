@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, ReactNode, useState } from "react";
-import { demoConfirmAccount } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 
 type AuthView = "sign_in" | "sign_up" | "confirm";
@@ -82,26 +81,6 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleDemoConfirm = async () => {
-    if (!email.trim()) {
-      setError("Enter your email first.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      setError("");
-      setMessage("");
-      const result = await demoConfirmAccount(email.trim());
-      setView("sign_in");
-      setMessage(result.message);
-    } catch (authError) {
-      setError(errorMessage(authError));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <main className="min-h-screen bg-[#011A55] px-6 py-16 text-white">
       <section className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_420px] lg:items-center">
@@ -114,7 +93,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
             Your resume profile, saved jobs, application status, coach sessions,
-            and evaluation records are stored under your own account.
+            and preparation history are stored under your own account.
           </p>
         </div>
 
@@ -231,23 +210,6 @@ export default function AuthGate({ children }: { children: ReactNode }) {
               </button>
             )}
           </div>
-
-          {view === "confirm" && (
-            <div className="mt-5 rounded-lg border border-[#FFB238]/30 bg-[#FFB238]/10 p-4">
-              <p className="text-sm leading-6 text-slate-100">
-                For course evaluation only: if your email service blocks the
-                confirmation code, use demo confirmation and then sign in.
-              </p>
-              <button
-                type="button"
-                onClick={handleDemoConfirm}
-                disabled={submitting}
-                className="mt-3 rounded-lg border border-[#FFB238]/50 px-4 py-2 text-sm font-semibold text-[#FFB238] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Confirm for Demo
-              </button>
-            </div>
-          )}
         </form>
       </section>
     </main>

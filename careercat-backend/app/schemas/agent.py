@@ -18,3 +18,6 @@ class AgentAssistResponse(BaseModel):
     needs_user_input: bool = False
     follow_up_question: Optional[str] = None
     tool_args: Dict[str, Any] = Field(default_factory=dict)
+    workflow_goal: str = ""
+    current_stage_id: str = ""
+    stages: list[Dict[str, Any]] = Field(default_factory=list)

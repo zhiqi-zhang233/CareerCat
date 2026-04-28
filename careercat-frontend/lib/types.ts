@@ -206,62 +206,19 @@ export type AgentAssistResponse = {
   needs_user_input: boolean;
   follow_up_question?: string | null;
   tool_args: Record<string, unknown>;
+  workflow_goal: string;
+  current_stage_id: string;
+  stages: WorkflowStage[];
 };
 
-export type AgentRun = {
-  user_id: string;
-  run_id: string;
-  action_type: string;
-  selected_tool: string;
+export type WorkflowStage = {
+  id: string;
+  title: string;
+  agent: string;
+  action: string;
   route: string;
-  input_summary: string;
-  model_output_summary: string;
-  tool_result_summary: string;
-  success: boolean;
-  latency_ms: number;
-  error_message: string;
-  created_at: string;
-  metadata: Record<string, unknown>;
-};
-
-export type MetricCard = {
-  label: string;
-  value: string;
-  explanation: string;
-};
-
-export type ObservabilityMetrics = {
-  user_id: string;
-  total_runs: number;
-  success_rate: number;
-  average_latency_ms: number;
-  failure_count: number;
-  action_counts: Record<string, number>;
-  tool_counts: Record<string, number>;
-  latest_run_at: string;
-  metric_cards: MetricCard[];
-};
-
-export type SponsorshipFilterCase = {
-  case_id: string;
-  label: string;
-  job_text: string;
-  expected_visa_sponsorship: string;
-  detected_visa_sponsorship: string;
-  expected_action: string;
-  actual_action: string;
-  passed: boolean;
-  explanation: string;
-};
-
-export type SponsorshipFilterCheck = {
-  user_id: string;
-  metric_name: string;
-  sample_count: number;
-  accuracy: number;
-  passed_cases: number;
-  total_cases: number;
-  current_profile_requires_sponsorship: boolean;
-  decision_rule: string;
-  cases: SponsorshipFilterCase[];
+  depends_on: string[];
+  status: "ready" | "blocked" | "planned" | "complete";
+  needs_user_input: boolean;
+  output: string;
 };

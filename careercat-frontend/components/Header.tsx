@@ -71,15 +71,6 @@ export default function Header() {
             </span>
           </div>
 
-          <Link
-            href="/observability"
-            aria-label="Open developer observability"
-            title="Developer Observability"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-lg text-[#FFB238] transition hover:bg-white/10"
-          >
-            ⚙
-          </Link>
-
           {auth.isCognito ? (
             <button
               type="button"

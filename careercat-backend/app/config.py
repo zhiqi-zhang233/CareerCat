@@ -24,7 +24,6 @@ AUTH_MODE = os.getenv("AUTH_MODE", "local").lower()
 COGNITO_REGION = os.getenv("COGNITO_REGION", AWS_REGION)
 COGNITO_USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "")
 COGNITO_APP_CLIENT_ID = os.getenv("COGNITO_APP_CLIENT_ID", "")
-DEMO_AUTH_CONFIRM_ENABLED = os.getenv("DEMO_AUTH_CONFIRM_ENABLED", "false").lower() == "true"
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(

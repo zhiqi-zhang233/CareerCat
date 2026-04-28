@@ -1,14 +1,11 @@
 import { getCurrentAuthToken } from "./authToken";
 import type {
   AgentAssistRequest,
-  AgentRun,
   CoachChatRequest,
   CoachSession,
   JobDiscoveryRequest,
   JobRecommendation,
   JobUpdatePayload,
-  ObservabilityMetrics,
-  SponsorshipFilterCheck,
   UserProfile,
 } from "./types";
 
@@ -33,23 +30,6 @@ export async function fetchHealthCheck() {
 
   if (!response.ok) {
     throw new Error("Failed to fetch health check");
-  }
-
-  return response.json();
-}
-
-export async function demoConfirmAccount(email: string): Promise<{ message: string }> {
-  const response = await fetch(`${API_BASE_URL}/auth/demo-confirm`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to confirm demo account");
   }
 
   return response.json();
@@ -425,61 +405,7 @@ export async function sendAgentAssist(payload: AgentAssistRequest) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || "Failed to run Agent Assist");
-  }
-
-  return response.json();
-}
-
-export async function fetchObservabilityMetrics(
-  userId: string
-): Promise<ObservabilityMetrics> {
-  const response = await fetch(`${API_BASE_URL}/observability/metrics/${userId}`, {
-    headers: await buildHeaders(),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to fetch observability metrics");
-  }
-
-  return response.json();
-}
-
-export async function fetchAgentRuns(
-  userId: string,
-  limit = 50
-): Promise<{ user_id: string; runs: AgentRun[] }> {
-  const response = await fetch(
-    `${API_BASE_URL}/observability/runs/${userId}?limit=${limit}`,
-    {
-      headers: await buildHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to fetch agent runs");
-  }
-
-  return response.json();
-}
-
-export async function runSponsorshipFilterCheck(
-  userId: string,
-  sampleCount = 5
-): Promise<SponsorshipFilterCheck> {
-  const response = await fetch(
-    `${API_BASE_URL}/observability/quality/sponsorship-filter/${userId}?sample_count=${sampleCount}`,
-    {
-      method: "POST",
-      headers: await buildHeaders(),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to run sponsorship filter check");
+    throw new Error(errorText || "Failed to run the workflow agent");
   }
 
   return response.json();

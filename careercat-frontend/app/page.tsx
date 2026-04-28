@@ -1,73 +1,76 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { sendAgentAssist } from "@/lib/api";
-import type { AgentAssistResponse } from "@/lib/types";
+import type { AgentAssistResponse, WorkflowStage } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
 
 const STARTERS = [
-  "I want to create a new profile and upload my resume.",
-  "I want to import a job description and save the structured job information.",
-  "Recommend jobs for me based on specific requirements like role, location, salary, and posting date.",
-  "I want to review my current application status and saved jobs.",
-  "Train me for a written assessment on statistics.",
+  "Find jobs that match my resume, rank them, and tell me how to improve my resume for the best ones.",
+  "I want to import a job post, clean up the parsed fields, save it, and prepare for the interview.",
+  "Build a job search plan for data analyst roles in Chicago that sponsor visas.",
+  "Review my saved jobs and help me decide what to apply to next.",
+  "Prepare me for a Python and SQL technical interview based on my saved jobs.",
 ];
 
-const TOOL_LABELS: Record<string, string> = {
-  go_to_profile: "Profile Setup",
-  search_adzuna_jobs: "Job Discovery",
-  parse_job_post: "Job Import",
-  view_dashboard: "Application Dashboard",
-  start_gap_analysis: "Gap Analysis Coach",
-  start_mock_interview: "Mock Interview Coach",
-  start_written_practice: "Written Assessment Coach",
-  offer_platform_guidance: "Platform Guidance",
-  ask_followup_question: "Ask Follow-up",
+const STATUS_STYLES: Record<WorkflowStage["status"], string> = {
+  ready: "border-[#FFB238]/50 bg-[#FFB238]/10 text-[#FFB238]",
+  blocked: "border-red-300/30 bg-red-500/10 text-red-100",
+  planned: "border-white/10 bg-white/5 text-slate-200",
+  complete: "border-green-300/30 bg-green-500/10 text-green-100",
 };
 
 export default function Home() {
   const userId = useLocalUserId();
   const [message, setMessage] = useState("");
-  const [decision, setDecision] = useState<AgentAssistResponse | null>(null);
+  const [plan, setPlan] = useState<AgentAssistResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const canContinue = decision ? hasActionableRoute(decision) : false;
+
+  const currentStage = useMemo(() => {
+    if (!plan) return null;
+    return (
+      plan.stages.find((stage) => stage.id === plan.current_stage_id) ||
+      plan.stages.find((stage) => stage.status === "ready") ||
+      plan.stages[0] ||
+      null
+    );
+  }, [plan]);
+
+  const canContinue = Boolean(currentStage && currentStage.route !== "/");
 
   const fillStarter = (starter: string) => {
     setMessage(starter);
-    setDecision(null);
+    setPlan(null);
     setError("");
   };
 
-  const runAgent = async (nextMessage = message) => {
+  const runPlanner = async () => {
     if (!userId) {
-      setError("Local account is still loading. Please try again.");
+      setError("Your account is still loading. Please try again.");
       return;
     }
 
-    if (!nextMessage.trim()) {
-      setError("Tell CareerCat what you want to do next.");
+    if (!message.trim()) {
+      setError("Describe the job-search outcome you want.");
       return;
     }
 
     try {
       setLoading(true);
       setError("");
-
       const data = (await sendAgentAssist({
         user_id: userId,
-        message: nextMessage,
+        message,
         current_page: "/",
       })) as AgentAssistResponse;
-
-      setDecision(data);
-      setMessage(nextMessage);
-      storeDecision(data);
+      setPlan(data);
+      storePlan(data);
     } catch (agentError) {
       console.error(agentError);
-      setError("Agent Assist could not decide the next step. Please try again.");
+      setError("CareerCat could not plan this workflow. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -77,28 +80,27 @@ export default function Home() {
     <main className="min-h-screen bg-[#011A55] text-white">
       <Header />
 
-      <section className="mx-auto grid max-w-7xl gap-8 px-6 py-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+      <section className="mx-auto grid max-w-7xl gap-8 px-6 py-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div>
           <p className="text-sm font-semibold text-[#FFB238]">
-            CareerCat Agent Assist
+            CareerCat Workflow Agents
           </p>
-          <h1 className="mt-4 max-w-4xl text-5xl font-bold leading-tight text-[#FFB238] md:text-6xl">
-            Tell CareerCat what you want to do next.
+          <h1 className="mt-4 max-w-3xl text-4xl font-bold leading-tight text-[#FFB238] md:text-5xl">
+            Plan a job search workflow.
           </h1>
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-            I can route your job search workflow, choose the right CareerCat
-            tool, and help you move from resume setup to job discovery,
-            application tracking, interview practice, or written assessment
-            training.
+          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
+            Give CareerCat a complex goal. The agents will break it into ordered
+            steps, check dependencies, and send you to the next page that can
+            move the workflow forward.
           </p>
 
-          <section className="mt-10 rounded-lg border border-white/10 bg-white/5 p-6">
+          <section className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5">
             <label className="text-sm font-semibold text-[#FFB238]">
-              What do you need?
+              Goal
             </label>
             <textarea
-              className="mt-3 min-h-36 w-full rounded-lg border border-white/10 bg-white/10 p-4 text-white placeholder-slate-400 focus:outline-none"
-              placeholder="Example: Find remote machine learning engineer jobs posted in the last 3 days."
+              className="mt-3 min-h-40 w-full rounded-lg border border-white/10 bg-white/10 p-4 text-white placeholder-slate-400 focus:outline-none"
+              placeholder="Example: Find roles that fit my resume, rank them, identify skill gaps, and help me prepare."
               value={message}
               onChange={(event) => setMessage(event.target.value)}
             />
@@ -106,20 +108,20 @@ export default function Home() {
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => runAgent()}
+                onClick={runPlanner}
                 disabled={loading}
                 className="rounded-lg bg-[#FFB238] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Deciding..." : "Ask Agent Assist"}
+                {loading ? "Planning..." : "Plan Workflow"}
               </button>
 
-              {decision && canContinue && (
+              {canContinue && currentStage && (
                 <Link
-                  href={decision.route}
-                  onClick={() => storeDecision(decision)}
+                  href={currentStage.route}
+                  onClick={() => plan && storePlan(plan)}
                   className="rounded-lg border border-[#FFB238]/40 px-5 py-3 font-semibold text-[#FFB238] transition hover:bg-white/10"
                 >
-                  Continue to {routeName(decision.route)}
+                  Continue to {routeName(currentStage.route)}
                 </Link>
               )}
             </div>
@@ -131,11 +133,11 @@ export default function Home() {
             )}
           </section>
 
-          <section className="mt-8">
-            <h2 className="text-lg font-semibold text-[#FFB238]">
-              Try a starter request
+          <section className="mt-7">
+            <h2 className="text-base font-semibold text-[#FFB238]">
+              Starter goals
             </h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-3 grid gap-3">
               {STARTERS.map((starter) => (
                 <button
                   type="button"
@@ -150,99 +152,78 @@ export default function Home() {
           </section>
         </div>
 
-        <aside className="rounded-lg border border-white/10 bg-white/5 p-6">
-          <h2 className="text-xl font-semibold text-[#FFB238]">
-            Agent Decision
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            This panel shows how the LLM supervisor handled the request: it may
-            route to a tool, ask a follow-up, or stay here and guide the user.
-          </p>
+        <aside className="rounded-lg border border-white/10 bg-white/5 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#FFB238]">
+                Workflow Plan
+              </p>
+              <h2 className="mt-2 text-2xl font-bold text-white">
+                {plan?.workflow_goal || "No active workflow"}
+              </h2>
+            </div>
+            {currentStage && (
+              <span className={`rounded-lg border px-3 py-2 text-xs font-semibold ${STATUS_STYLES[currentStage.status]}`}>
+                Next: {currentStage.title}
+              </span>
+            )}
+          </div>
 
-          {!decision ? (
+          {!plan ? (
             <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5">
               <p className="text-sm leading-6 text-slate-300">
-                Ask a question or choose a starter request. CareerCat will decide
-                which workflow should handle it.
+                A workflow plan will appear here with ordered stages, dependency
+                checks, and the next action.
               </p>
             </div>
           ) : (
-            <div className="mt-8 space-y-4">
-              <DecisionRow label="Intent" value={decision.intent} />
-              <DecisionRow
-                label="Selected Tool"
-                value={TOOL_LABELS[decision.selected_tool] || decision.selected_tool}
-              />
-              <DecisionRow
-                label="Route"
-                value={canContinue ? decision.route : "No page change"}
-              />
-              <DecisionRow
-                label="Needs More Input"
-                value={decision.needs_user_input ? "Yes" : "No"}
-              />
-
+            <div className="mt-6 space-y-5">
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase text-slate-400">Agent Reply</p>
-                <p className="mt-2 text-sm leading-6 text-white">
-                  {decision.reply}
-                </p>
-              </div>
-
-              {decision.follow_up_question && (
-                <div className="rounded-lg border border-[#FFB238]/30 bg-[#FFB238]/10 p-4">
-                  <p className="text-xs uppercase text-[#FFB238]">
-                    Follow-up
+                <p className="text-xs uppercase text-slate-400">Planner Reply</p>
+                <p className="mt-2 text-sm leading-6 text-white">{plan.reply}</p>
+                {plan.follow_up_question && (
+                  <p className="mt-3 text-sm leading-6 text-[#FFB238]">
+                    {plan.follow_up_question}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-white">
-                    {decision.follow_up_question}
-                  </p>
-                </div>
-              )}
-
-              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase text-slate-400">Reason</p>
-                <p className="mt-2 text-sm leading-6 text-white">
-                  {decision.reason}
-                </p>
+                )}
               </div>
 
-              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase text-slate-400">
-                  Extracted Tool Args
-                </p>
-                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-200">
-                  {Object.keys(decision.tool_args || {}).length
-                    ? JSON.stringify(decision.tool_args, null, 2)
-                    : "No tool arguments extracted."}
-                </pre>
+              <div className="grid gap-3">
+                {plan.stages.map((stage, index) => (
+                  <StageRow
+                    key={stage.id}
+                    stage={stage}
+                    index={index}
+                    active={stage.id === plan.current_stage_id}
+                  />
+                ))}
               </div>
 
-              {canContinue ? (
+              <div className="grid gap-3 rounded-lg border border-white/10 bg-white/5 p-4 md:grid-cols-2">
+                <DecisionMeta label="Intent" value={plan.intent} />
+                <DecisionMeta label="Selected Agent" value={agentName(plan.selected_tool)} />
+                <DecisionMeta label="Reason" value={plan.reason} />
+                <DecisionMeta
+                  label="Extracted Inputs"
+                  value={
+                    Object.keys(plan.tool_args || {}).length
+                      ? JSON.stringify(plan.tool_args)
+                      : "No structured inputs yet"
+                  }
+                />
+              </div>
+
+              {canContinue && currentStage ? (
                 <Link
-                  href={decision.route}
-                  onClick={() => storeDecision(decision)}
+                  href={currentStage.route}
+                  onClick={() => storePlan(plan)}
                   className="block rounded-lg bg-[#FFB238] px-5 py-3 text-center font-semibold text-[#011A55] transition hover:opacity-90"
                 >
-                  Continue to {routeName(decision.route)}
+                  Continue to {routeName(currentStage.route)}
                 </Link>
               ) : (
-                <div className="rounded-lg border border-[#FFB238]/30 bg-[#FFB238]/10 p-4">
-                  <p className="text-sm font-semibold text-[#FFB238]">
-                    Try asking for one concrete next step.
-                  </p>
-                  <div className="mt-3 grid gap-2">
-                    {STARTERS.slice(0, 3).map((starter) => (
-                      <button
-                        type="button"
-                        key={starter}
-                        onClick={() => fillStarter(starter)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left text-xs leading-5 text-slate-200 transition hover:border-[#FFB238]/50"
-                      >
-                        {starter}
-                      </button>
-                    ))}
-                  </div>
+                <div className="rounded-lg border border-[#FFB238]/30 bg-[#FFB238]/10 p-4 text-sm leading-6 text-slate-100">
+                  Add one concrete goal or constraint to continue.
                 </div>
               )}
             </div>
@@ -253,20 +234,69 @@ export default function Home() {
   );
 }
 
-function storeDecision(decision: AgentAssistResponse) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    "careercat_last_agent_decision",
-    JSON.stringify(decision)
+function StageRow({
+  stage,
+  index,
+  active,
+}: {
+  stage: WorkflowStage;
+  index: number;
+  active: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        active
+          ? "border-[#FFB238]/50 bg-[#FFB238]/10"
+          : "border-white/10 bg-white/5"
+      }`}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs text-slate-400">
+            Stage {index + 1} · {stage.agent}
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-white">{stage.title}</h3>
+        </div>
+        <span className={`w-fit rounded-lg border px-3 py-1 text-xs font-semibold ${STATUS_STYLES[stage.status]}`}>
+          {stage.status}
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-300">{stage.action}</p>
+      <div className="mt-3 grid gap-2 text-xs text-slate-300 md:grid-cols-3">
+        <p>Route: {routeName(stage.route)}</p>
+        <p>Depends on: {stage.depends_on.length ? stage.depends_on.join(", ") : "None"}</p>
+        <p>{stage.needs_user_input ? "Needs user input" : "Can run from saved context"}</p>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-slate-400">
+        Output: {stage.output}
+      </p>
+    </div>
   );
 }
 
-function DecisionRow({ label, value }: { label: string; value: string }) {
+function DecisionMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+    <div className="min-w-0">
       <p className="text-xs uppercase text-slate-400">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+      <p className="mt-1 break-words text-sm text-white">{value}</p>
     </div>
+  );
+}
+
+function agentName(tool: string) {
+  return (
+    {
+      go_to_profile: "Profile Agent",
+      search_adzuna_jobs: "Job Search Agent",
+      parse_job_post: "Job Parser Agent",
+      view_dashboard: "Tracker Agent",
+      start_gap_analysis: "Fit Agent",
+      start_mock_interview: "Coach Agent",
+      start_written_practice: "Coach Agent",
+      offer_platform_guidance: "Goal Agent",
+      ask_followup_question: "Goal Agent",
+    }[tool] || "Workflow Agent"
   );
 }
 
@@ -278,14 +308,12 @@ function routeName(route: string) {
       "/import-jobs": "Import Jobs",
       "/dashboard": "Dashboard",
       "/coach": "Coach",
+      "/": "Home",
     }[route] || "Next Step"
   );
 }
 
-function hasActionableRoute(decision: AgentAssistResponse) {
-  return (
-    decision.route !== "/" &&
-    decision.selected_tool !== "offer_platform_guidance" &&
-    decision.selected_tool !== "ask_followup_question"
-  );
+function storePlan(plan: AgentAssistResponse) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem("careercat_last_workflow_plan", JSON.stringify(plan));
 }

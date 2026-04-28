@@ -4,7 +4,7 @@
 
 **Website:** https://main.d2taej5h07fd9k.amplifyapp.com
 
-CareerCat is an agentic AI job search assistant that helps users turn a messy, multi-step job search into a structured workspace. It supports resume-based profile setup, AI job post parsing, job recommendations, application tracking, interview and written assessment coaching, and an observability page for inspecting agent behavior.
+CareerCat is an agentic AI job search assistant that helps users turn a messy, multi-step job search into a structured workspace. It supports resume-based profile setup, AI job post parsing, job recommendations, application tracking, and interview or written assessment coaching through a multi-stage workflow agent.
 
 The main pain point CareerCat addresses is that job seekers often have to manually copy jobs, track applications in spreadsheets, interpret resume-job fit, and prepare for interviews across disconnected tools. CareerCat brings those steps into one account-based web app where an LLM can decide which workflow or tool should handle the user's request.
 
@@ -30,12 +30,11 @@ flowchart LR
 - **Job recommendations:** CareerCat can search Adzuna jobs by role, keyword, location, posting date range, and other user needs, then filter recommendations against the user's sponsorship requirement.
 - **Application dashboard:** Saved jobs are displayed in a board-like dashboard with filters, sorting, application status updates, application dates, posting dates, notes, and job details.
 - **Application status tracking:** Jobs default to `Not Applied` and can be moved through statuses such as applied, assessment, interview, offer, rejected, or other progress states.
-- **Agent Assist homepage:** The home page is an LLM-powered routing assistant. It can route the user to profile setup, job import, recommendations, dashboard, or coach workflows based on natural language input.
-- **Smooth fallback behavior:** If the user enters unclear or unrelated text, Agent Assist provides platform guidance instead of forcing an irrelevant workflow.
+- **Multi-stage workflow agents:** The home page is an LLM-powered planning surface. It turns complex requests into ordered stages, chooses the right specialist agent or tool for each stage, tracks dependencies, and routes the user to the next actionable page.
+- **Smooth fallback behavior:** If the user enters unclear or unrelated text, the workflow agent provides platform guidance and asks for useful details instead of forcing an irrelevant workflow.
 - **AI Career Coach:** The coach supports resume-job gap analysis, technical mock interviews, behavioral mock interviews, and written assessment practice.
 - **Language-aware code rendering:** Coach responses render fenced code blocks with syntax highlighting for common languages such as Python, SQL, JavaScript, TypeScript, JSON, Bash, HTML/XML, CSS, Java, C++, C#, R, Go, Rust, and YAML.
-- **Developer observability page:** A gear icon opens a developer-facing page that shows agent runs, workflow decisions, errors, latency, success rates, tool usage, and quality checks.
-- **Quality metric demo:** The observability page includes a Sponsorship Filter Accuracy Check where a reviewer can choose a random sample size and visualize how sponsorship filtering performs.
+- **Internal workflow logs:** Backend agent and tool runs can be stored in DynamoDB for debugging, latency inspection, and future product analytics.
 
 ## Set Up Instructions
 
@@ -60,7 +59,7 @@ Install the following before running the project:
 
 Important local-development note:
 
-`AUTH_MODE=local` only bypasses Cognito authentication. It does not replace Bedrock, DynamoDB, or Adzuna. To test AI parsing, recommendations, saved profile data, saved jobs, and observability records locally, the backend still needs valid AWS credentials and DynamoDB tables.
+`AUTH_MODE=local` only bypasses Cognito authentication. It does not replace Bedrock, DynamoDB, or Adzuna. To test AI parsing, recommendations, saved profile data, saved jobs, coach history, and workflow logs locally, the backend still needs valid AWS credentials and DynamoDB tables.
 
 ### Installation
 
@@ -114,9 +113,6 @@ AUTH_MODE=local
 COGNITO_REGION=us-east-2
 COGNITO_USER_POOL_ID=your-cognito-user-pool-id
 COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
-
-# Course/demo convenience only. Keep false unless intentionally enabling demo confirmation.
-DEMO_AUTH_CONFIRM_ENABLED=false
 
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
@@ -216,7 +212,7 @@ AgentRuns
 CoachSessions
 ```
 
-The code reads the exact names from environment variables, so the table names can be changed as long as the environment variables are updated. The current implementation stores user profile records, saved job records, agent observability records, and cross-device coach chat history in DynamoDB.
+The code reads the exact names from environment variables, so the table names can be changed as long as the environment variables are updated. The current implementation stores user profile records, saved job records, internal agent workflow logs, and cross-device coach chat history in DynamoDB.
 
 ### Useful Developer Commands
 
@@ -247,33 +243,33 @@ docker build -t careercat-backend .
 
 CareerCat is primarily used through the web interface.
 
-### 1. Start With Agent Assist
+### 1. Start With Workflow Agents
 
-Open the home page. The Agent Assist panel asks what the user wants to do next. Starter requests fill the text box first so the user can edit details before asking the agent.
+Open the home page. The workflow agent asks what the user wants to accomplish and turns that goal into a staged plan. Starter goals fill the text box first so the user can edit details before asking the agent.
 
 Example requests:
 
 ```text
-I want to create a new profile and upload my resume.
+I want to create a new profile, upload my resume, and find data analyst jobs that match it.
 ```
 
 ```text
-I want to import a job description and save the structured job information.
+I want to import a job description, check sponsorship fit, and save it if it matches my goals.
 ```
 
 ```text
-Recommend jobs for me based on specific requirements like role, location, salary, and posting date.
+Find fresh data analyst jobs in Chicago posted this week, then help me prioritize which ones to apply to.
 ```
 
 ```text
-I want to review my current application status and saved jobs.
+Review my saved jobs, show my current application status, and help me choose the next follow-up.
 ```
 
 ```text
-Train me for a written assessment on statistics.
+Train me for a written assessment on Python and SQL for data roles.
 ```
 
-The LLM supervisor decides whether to route the user to profile setup, job import, job recommendations, the dashboard, or the coach page. If the message is vague or unrelated, it gives guidance instead of forcing a route.
+The LLM planner identifies the user's goal, chooses the relevant specialist agent, builds an ordered sequence of stages, marks blocked steps that need user input, and routes the user to the current actionable page. If the message is vague or unrelated, it gives guidance instead of forcing a route.
 
 ### 2. Build a Profile
 
@@ -289,7 +285,7 @@ If the user needs sponsorship and the job appears not to support sponsorship, Ca
 
 ### 4. Get Job Recommendations
 
-Go to **Job Recommendations** or ask Agent Assist for fresh jobs. CareerCat uses Adzuna as a job source and can search by keyword, role, location, posting window, and result count. The recommendation workflow avoids recommending jobs that conflict with the user's sponsorship requirement when sponsorship information is detectable.
+Go to **Job Recommendations** or ask the workflow agent for fresh jobs. CareerCat uses Adzuna as a job source and can search by keyword, role, location, posting window, and result count. The recommendation workflow avoids recommending jobs that conflict with the user's sponsorship requirement when sponsorship information is detectable.
 
 ### 5. Track Applications
 
@@ -302,12 +298,6 @@ Go to **Coach** to start a coaching session. CareerCat supports three coaching m
 - **Resume and Job Gap:** Select a saved job from the dashboard. The coach explains how the user's resume could be improved for that role and what skills are missing.
 - **Mock Interview:** Choose technical or behavioral interview practice. The coach asks one question at a time, scores the answer, and continues when the user is ready.
 - **Written Assessment:** Enter a topic such as statistics, SQL, Python, algorithms, or data analysis. The coach explains concepts, gives practice problems, and can show code with language-aware syntax highlighting.
-
-### 7. Inspect Observability and Metrics
-
-Open the gear icon in the header to view the developer observability page. This page is designed to be readable for reviewers and non-specialist stakeholders, not just engineers. It shows recent agent runs, workflow decisions, selected tools, status, latency, inputs, outputs, errors, and summary metrics.
-
-The page also includes a quality metric demo: **Sponsorship Filter Accuracy Check**. A reviewer can choose a random sample size, run the check, and see how accurately the sponsorship filter handles labeled examples.
 
 ### Example API Check
 
@@ -351,7 +341,7 @@ Expected response:
 ### Tools, Services, and APIs
 
 - Amazon Bedrock for LLM-powered parsing, routing, recommendations, and coaching
-- Amazon DynamoDB for user data, coach sessions, and observability records
+- Amazon DynamoDB for user data, coach sessions, and internal workflow logs
 - Amazon Cognito for production account authentication
 - AWS App Runner for backend deployment
 - AWS Amplify Hosting for frontend deployment
@@ -377,12 +367,9 @@ CareerCat/
 |       +-- routers/
 |       |   +-- agent.py
 |       |   +-- analysis.py
-|       |   +-- auth.py
 |       |   +-- coach.py
-|       |   +-- debug.py
 |       |   +-- job_discovery.py
 |       |   +-- jobs.py
-|       |   +-- observability.py
 |       |   +-- profile.py
 |       |   +-- recommend.py
 |       +-- schemas/
@@ -390,7 +377,6 @@ CareerCat/
 |       |   +-- coach.py
 |       |   +-- job_discovery.py
 |       |   +-- jobs.py
-|       |   +-- observability.py
 |       |   +-- profile.py
 |       +-- services/
 |           +-- adzuna_service.py
@@ -421,7 +407,6 @@ CareerCat/
     |   +-- recommendations/page.tsx
     |   +-- dashboard/page.tsx
     |   +-- coach/page.tsx
-    |   +-- observability/page.tsx
     +-- components/
     |   +-- AuthGate.tsx
     |   +-- Header.tsx
@@ -444,25 +429,24 @@ CareerCat/
 - `app/routers/`: API route definitions by feature area.
 - `app/schemas/`: Pydantic request and response models.
 - `app/services/bedrock_service.py`: Bedrock LLM calls and structured parsing helpers.
-- `app/services/agent_assist_service.py`: Agent Assist routing and tool-selection logic.
-- `app/services/dynamodb_service.py`: DynamoDB persistence for profiles, jobs, coach sessions, and observability records.
-- `app/services/sponsorship_filter_service.py`: Sponsorship filtering and quality-check samples.
+- `app/services/agent_assist_service.py`: Multi-stage workflow planning, routing, and tool-selection logic.
+- `app/services/dynamodb_service.py`: DynamoDB persistence for profiles, jobs, coach sessions, and internal workflow logs.
+- `app/services/sponsorship_filter_service.py`: Sponsorship signal inference and filtering helpers.
 
 ### Important Frontend Areas
 
-- `app/page.tsx`: Agent Assist homepage.
+- `app/page.tsx`: Multi-stage workflow agent homepage.
 - `app/profile/page.tsx`: Resume upload and editable profile setup.
 - `app/import-jobs/page.tsx`: Job description import and sponsorship warning workflow.
 - `app/recommendations/page.tsx`: Adzuna-backed job discovery UI.
 - `app/dashboard/page.tsx`: Saved job board with status tracking, filtering, and sorting.
 - `app/coach/page.tsx`: AI Career Coach sessions and code-aware Markdown rendering.
-- `app/observability/page.tsx`: Developer observability and metrics page.
 - `components/AuthGate.tsx`: Switches between local auth and Cognito auth.
 - `lib/api.ts`: Frontend API client.
 
 ## Deployment Notes
 
-The deployed course version uses AWS:
+The deployed product version uses AWS:
 
 - **Frontend:** AWS Amplify Hosting
 - **Backend:** AWS App Runner
@@ -548,7 +532,6 @@ AUTH_MODE=cognito
 COGNITO_REGION=us-east-2
 COGNITO_USER_POOL_ID=your-cognito-user-pool-id
 COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
-DEMO_AUTH_CONFIRM_ENABLED=false
 CORS_ALLOWED_ORIGINS=https://your-amplify-url,http://localhost:3000
 ```
 
@@ -574,26 +557,13 @@ For production-style deployment:
 
 During testing, Gmail/Google email addresses have received Cognito verification codes more reliably and quickly than some school or organization email domains. If a new user does not receive a code, try registering with a Gmail address first.
 
-For a course demo, `DEMO_AUTH_CONFIRM_ENABLED` can be temporarily set to `true` to expose a demo confirmation endpoint/button if email confirmation is unreliable. The submitted course deployment currently enables this convenience so reviewers are not blocked by email delivery issues. This should not be used for a real production product.
+### Internal Workflow Logs
 
-### Observability and Metrics
-
-CareerCat records workflow traces in the `AgentRuns` DynamoDB table. Coach conversations are stored separately in the `CoachSessions` table so history follows the user's account across browsers and devices. The observability page summarizes:
-
-- Recent agent/tool runs.
-- Workflow names and selected tools.
-- Success and failure states.
-- Latency in milliseconds.
-- Inputs and outputs/results.
-- Errors for debugging.
-- Workflow usage counts.
-- Sponsorship Filter Accuracy Check as a quality metric.
-
-These records make it clear that the LLM is not only generating text, but making workflow decisions, choosing tools, and producing inspectable system behavior.
+CareerCat can record workflow traces in the `AgentRuns` DynamoDB table. Coach conversations are stored separately in the `CoachSessions` table so history follows the user's account across browsers and devices. The workflow logs capture selected agents/tools, success or failure status, latency, input summaries, output summaries, and errors. They are intended for backend debugging and future product analytics rather than as a public end-user feature.
 
 ### Why This System Is Agentic
 
-CareerCat includes deterministic UI workflows, but its key agentic component is the Agent Assist supervisor. Given a user's natural-language request, the LLM decides whether to:
+CareerCat includes deterministic UI workflows, but its key agentic component is the multi-stage workflow planner on the home page. Given a user's natural-language request, the LLM decides whether to:
 
 - Route to profile setup.
 - Trigger job recommendation workflow.
@@ -605,7 +575,7 @@ CareerCat includes deterministic UI workflows, but its key agentic component is 
 - Ask a follow-up question.
 - Stay on the home page and provide guidance for unclear input.
 
-The same input box can lead to different tools, pages, arguments, and next steps. That dynamic routing and tool selection is what makes the system meaningfully agentic rather than a fixed pipeline.
+The LLM also produces an ordered plan with stage dependencies, current ready step, required user inputs, and expected outputs. The same input box can therefore lead to different tools, pages, arguments, next steps, and staged plans. That dynamic planning, routing, and tool selection is what makes the system meaningfully agentic rather than a fixed pipeline.
 
 ### Reproducing or Extending the Project
 
@@ -620,11 +590,11 @@ To reproduce the project:
 7. Deploy the frontend and set `NEXT_PUBLIC_API_BASE_URL` to the backend URL.
 8. Confirm CORS allows the deployed frontend URL.
 9. Create a test account or use local mode for development.
-10. Test the main workflows: profile setup, job import, recommendations, dashboard status updates, coach sessions, and observability.
+10. Test the main workflows: profile setup, job import, recommendations, dashboard status updates, coach sessions, and the homepage workflow planner.
 
 Common extension points:
 
 - Add more job data providers in `careercat-backend/app/services/`.
 - Add more coach modes in `interview_coach_service.py` and `app/coach/page.tsx`.
-- Add new observability metrics in `observability_service.py` and `app/observability/page.tsx`.
+- Add richer workflow analytics in `observability_service.py` or your own reporting layer.
 - Add more structured job fields in `schemas/jobs.py`, `job_parser_service.py`, and the dashboard UI.

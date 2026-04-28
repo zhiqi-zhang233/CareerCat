@@ -7,11 +7,8 @@ from app.routers import (
     jobs,
     analysis,
     coach,
-    debug,
     job_discovery,
     agent,
-    observability,
-    auth,
 )
 
 app = FastAPI(title="CareerCat API")
@@ -29,11 +26,8 @@ app.include_router(recommend.router)
 app.include_router(jobs.router)
 app.include_router(analysis.router)
 app.include_router(coach.router)
-app.include_router(debug.router)
 app.include_router(job_discovery.router)
 app.include_router(agent.router)
-app.include_router(observability.router)
-app.include_router(auth.router)
 
 @app.get("/")
 def read_root():
