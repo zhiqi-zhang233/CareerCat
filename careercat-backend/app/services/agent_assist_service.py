@@ -3,10 +3,12 @@ from app.services.bedrock_service import generate_structured_json
 
 ALLOWED_ROUTES = {
     "/",
+    "/workspace",
     "/profile",
     "/recommendations",
     "/import-jobs",
     "/dashboard",
+    "/insights",
     "/coach",
 }
 
@@ -15,6 +17,7 @@ ALLOWED_TOOLS = {
     "search_adzuna_jobs",
     "parse_job_post",
     "view_dashboard",
+    "view_insights",
     "start_gap_analysis",
     "start_mock_interview",
     "start_written_practice",
@@ -23,7 +26,7 @@ ALLOWED_TOOLS = {
 }
 
 
-def decide_next_step(message: str, profile: dict | None, current_page: str = "/"):
+def decide_next_step(message: str, profile: dict | None, current_page: str = "/workspace"):
     system_prompt = """
 You are CareerCat Workflow Coordinator, a multi-stage planning agent for an AI job-search web app.
 
@@ -39,20 +42,23 @@ CareerCat has these tools and pages:
 4. view_dashboard -> /dashboard
    Use when the user wants to track saved jobs, update application status, dates,
    notes, or review their application pipeline.
-5. start_gap_analysis -> /coach
+5. view_insights -> /insights
+   Use when the user wants analytics, progress reports, application funnel,
+   response rates, skill summaries, or "how am I doing" overviews.
+6. start_gap_analysis -> /coach
    Use when the user wants resume-vs-job gap analysis or wants to improve a resume
    for a selected saved job.
-6. start_mock_interview -> /coach
+7. start_mock_interview -> /coach
    Use when the user wants technical or behavioral interview practice.
-7. start_written_practice -> /coach
+8. start_written_practice -> /coach
    Use when the user wants written assessment, coding test, SQL, analytics,
    statistics, or technical skill practice.
-8. offer_platform_guidance -> /
+9. offer_platform_guidance -> /workspace
    Use when the user sends a greeting, small talk, unclear text, off-topic text,
    nonsense, or a vague request that does not yet point to a CareerCat workflow.
    Do not force a page route. Briefly explain what CareerCat can help with and
    ask one simple question that helps the user choose a workflow.
-9. ask_followup_question -> /
+10. ask_followup_question -> /workspace
    Use only when the user goal is related to CareerCat but still too ambiguous
    to choose a useful route.
 
@@ -65,7 +71,7 @@ JSON schema:
   "reply": "short helpful assistant response",
   "intent": "profile_setup | job_discovery | job_import | dashboard_tracking | gap_analysis | mock_interview | written_practice | general_guidance | unclear",
   "selected_tool": "one allowed tool",
-  "route": "/ | /profile | /recommendations | /import-jobs | /dashboard | /coach",
+  "route": "/workspace | /profile | /recommendations | /import-jobs | /dashboard | /insights | /coach",
   "reason": "why this tool was selected",
   "needs_user_input": true,
   "follow_up_question": "string or null",
@@ -101,7 +107,7 @@ Rules:
 4. If the user asks about a specific saved job or resume gap, route to /coach with mode gap_analysis.
 5. If important details are missing but a route is still obvious, choose the route and ask a brief follow-up.
 6. If the message is only a greeting, small talk, random text, or not connected
-   to a job-search task, choose offer_platform_guidance and route "/".
+   to a job-search task, choose offer_platform_guidance and route "/workspace".
 7. Keep reply under 80 words.
 8. For multi-step goals, create 4-7 ordered stages with dependencies.
 9. Mark stages that require missing user data as blocked or ready with needs_user_input true.
@@ -195,12 +201,13 @@ def _route_for_tool(selected_tool: str):
         "search_adzuna_jobs": "/recommendations",
         "parse_job_post": "/import-jobs",
         "view_dashboard": "/dashboard",
+        "view_insights": "/insights",
         "start_gap_analysis": "/coach",
         "start_mock_interview": "/coach",
         "start_written_practice": "/coach",
-        "offer_platform_guidance": "/",
-        "ask_followup_question": "/",
-    }.get(selected_tool, "/")
+        "offer_platform_guidance": "/workspace",
+        "ask_followup_question": "/workspace",
+    }.get(selected_tool, "/workspace")
 
 
 def _fallback_decision(message: str):
@@ -211,7 +218,7 @@ def _fallback_decision(message: str):
             "reply": "Hi, I can help you set up your profile, find jobs, import job posts, track applications, or practice interviews. What would you like to work on first?",
             "intent": "general_guidance",
             "selected_tool": "offer_platform_guidance",
-            "route": "/",
+            "route": "/workspace",
             "reason": "The message does not contain a clear CareerCat workflow request yet.",
             "needs_user_input": True,
             "follow_up_question": "Do you want to set up your profile, find jobs, import a job post, track applications, or practice interviews?",
@@ -270,7 +277,7 @@ def _fallback_decision(message: str):
         "reply": "I can help with profile setup, job discovery, job import, application tracking, or coaching. What would you like to do first?",
         "intent": "general_guidance",
         "selected_tool": "offer_platform_guidance",
-        "route": "/",
+        "route": "/workspace",
         "reason": "The user request is too broad to choose a workflow.",
         "needs_user_input": True,
         "follow_up_question": "Would you like to set up your profile, find jobs, import a job post, track applications, or practice interviews?",
@@ -376,6 +383,7 @@ def _agent_for_tool(selected_tool: str):
         "search_adzuna_jobs": "Job Search Agent",
         "parse_job_post": "Job Parser Agent",
         "view_dashboard": "Tracker Agent",
+        "view_insights": "Insights Agent",
         "start_gap_analysis": "Fit Agent",
         "start_mock_interview": "Coach Agent",
         "start_written_practice": "Coach Agent",
@@ -397,7 +405,7 @@ def _profile_stages():
         _stage("profile_parse", "Parse Resume", "Profile Agent", "/profile", "Upload or edit resume-derived profile fields.", [], "ready", True, "Structured profile."),
         _stage("profile_constraints", "Confirm Targets", "Goal Agent", "/profile", "Confirm target roles, locations, and sponsorship needs.", ["profile_parse"], "planned", True, "Job-search constraints."),
         _stage("profile_save", "Save Profile", "Profile Agent", "/profile", "Persist corrected resume details and preferences to the account.", ["profile_constraints"], "planned", True, "Saved profile."),
-        _stage("next_workflow", "Choose Next Workflow", "Goal Agent", "/", "Move to recommendations, job import, or coaching.", ["profile_save"], "planned", True, "Next workflow decision."),
+        _stage("next_workflow", "Choose Next Workflow", "Goal Agent", "/workspace", "Move to recommendations, job import, or coaching.", ["profile_save"], "planned", True, "Next workflow decision."),
     ]
 
 
@@ -445,10 +453,10 @@ def _dashboard_stages():
 
 def _guidance_stages():
     return [
-        _stage("clarify_goal", "Clarify Goal", "Goal Agent", "/", "Identify whether the user wants profile setup, job search, import, tracking, or coaching.", [], "ready", True, "Clear workflow goal."),
-        _stage("choose_workflow", "Choose Workflow", "Goal Agent", "/", "Route to the first useful page after the goal is clear.", ["clarify_goal"], "blocked", True, "Selected workflow."),
-        _stage("open_workspace", "Open Workspace", "Goal Agent", "/", "Send the user to the selected workflow page.", ["choose_workflow"], "blocked", True, "Next page."),
-        _stage("continue_task", "Continue Task", "Goal Agent", "/", "Use the selected page to continue the job-search task.", ["open_workspace"], "blocked", True, "Progress on the chosen workflow."),
+        _stage("clarify_goal", "Clarify Goal", "Goal Agent", "/workspace", "Identify whether the user wants profile setup, job search, import, tracking, or coaching.", [], "ready", True, "Clear workflow goal."),
+        _stage("choose_workflow", "Choose Workflow", "Goal Agent", "/workspace", "Route to the first useful page after the goal is clear.", ["clarify_goal"], "blocked", True, "Selected workflow."),
+        _stage("open_workspace", "Open Workspace", "Goal Agent", "/workspace", "Send the user to the selected workflow page.", ["choose_workflow"], "blocked", True, "Next page."),
+        _stage("continue_task", "Continue Task", "Goal Agent", "/workspace", "Use the selected page to continue the job-search task.", ["open_workspace"], "blocked", True, "Progress on the chosen workflow."),
     ]
 
 

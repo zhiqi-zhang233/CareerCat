@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import AuthGate from "@/components/AuthGate";
 import { AuthProvider } from "@/lib/AuthContext";
 import "./globals.css";
 
@@ -15,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CareerCat",
-  description: "Your personal AI job search agent",
+  title: "CareerCat — Your AI Job Search Copilot",
+  description:
+    "CareerCat turns the chaotic job hunt into a structured workspace. Parse resumes, track applications, prep for interviews, and let an AI agent plan your next step.",
 };
 
 export default function RootLayout({
@@ -30,9 +30,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <AuthGate>{children}</AuthGate>
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

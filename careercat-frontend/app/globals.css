@@ -1,30 +1,308 @@
 @import "tailwindcss";
 
+/* =========================================================
+   CareerCat Design Tokens
+   ---------------------------------------------------------
+   Brand colors:
+     - Ink (deep navy)   : primary background
+     - Honey (amber)     : primary accent / CTA
+     - Cream             : neutral content surfaces
+   Use semantic tokens (--color-bg, --color-text-*) in components.
+   ========================================================= */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand */
+  --brand-ink-50:  #f4f6fb;
+  --brand-ink-100: #d8dff0;
+  --brand-ink-200: #a7b3d6;
+  --brand-ink-300: #6f7fb3;
+  --brand-ink-400: #3f5189;
+  --brand-ink-500: #1f3270;
+  --brand-ink-600: #102258;
+  --brand-ink-700: #011a55;   /* primary brand navy */
+  --brand-ink-800: #00133f;
+  --brand-ink-900: #000a26;
+
+  --brand-honey-50:  #fff8e8;
+  --brand-honey-100: #ffecbf;
+  --brand-honey-200: #ffd98a;
+  --brand-honey-300: #ffc358;
+  --brand-honey-400: #ffb238;   /* primary brand honey */
+  --brand-honey-500: #f59f1c;
+  --brand-honey-600: #cc7d10;
+  --brand-honey-700: #9b5e0b;
+
+  --brand-cream-50:  #fdfbf6;
+  --brand-cream-100: #f7f1e1;
+  --brand-cream-200: #efe4c8;
+
+  /* Neutral surfaces */
+  --neutral-0:   #ffffff;
+  --neutral-50:  #f8f9fc;
+  --neutral-100: #eef0f6;
+  --neutral-200: #dde2ec;
+  --neutral-300: #c1c8d6;
+  --neutral-400: #8d96aa;
+  --neutral-500: #626b80;
+  --neutral-600: #3f475a;
+  --neutral-700: #2a3142;
+  --neutral-800: #1a1f2c;
+  --neutral-900: #0d111a;
+
+  /* Status */
+  --color-success-50:  #e9f9ef;
+  --color-success-400: #34c171;
+  --color-success-600: #1f8b4f;
+  --color-warning-50:  #fff5e0;
+  --color-warning-400: #f5a524;
+  --color-warning-600: #b97a10;
+  --color-danger-50:   #fdecec;
+  --color-danger-400:  #ef4949;
+  --color-danger-600:  #b41f1f;
+  --color-info-50:     #e8f1ff;
+  --color-info-400:    #3b82f6;
+  --color-info-600:    #1d4ed8;
+
+  /* Semantic tokens — DEFAULT (dark-mode app shell) */
+  --color-bg:          var(--brand-ink-700);
+  --color-bg-elev-1:   rgba(255, 255, 255, 0.04);
+  --color-bg-elev-2:   rgba(255, 255, 255, 0.07);
+  --color-bg-inverse:  var(--neutral-0);
+
+  --color-border:        rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+
+  --color-text-primary:   #ffffff;
+  --color-text-secondary: #c8d0e2;
+  --color-text-muted:     #8b95ad;
+  --color-text-inverse:   var(--neutral-800);
+  --color-text-accent:    var(--brand-honey-400);
+
+  --color-accent:        var(--brand-honey-400);
+  --color-accent-hover:  var(--brand-honey-300);
+  --color-accent-text:   var(--brand-ink-700);
+
+  /* Typography */
+  --font-display: var(--font-geist-sans), "Geist", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans:    var(--font-geist-sans), "Geist", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    var(--font-geist-mono), "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  /* Shadows (work on light surfaces; dark surfaces rely on borders) */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.10);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.18);
+
+  /* Motion */
+  --duration-fast:  140ms;
+  --duration-base:  220ms;
+  --duration-slow:  360ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Marketing surfaces use a light theme. Apply by adding [data-surface="light"]
+   to a parent (e.g. on marketing layout). */
+[data-surface="light"] {
+  --color-bg:          var(--brand-cream-50);
+  --color-bg-elev-1:   #ffffff;
+  --color-bg-elev-2:   var(--neutral-50);
+  --color-bg-inverse:  var(--brand-ink-700);
+
+  --color-border:        var(--neutral-200);
+  --color-border-strong: var(--neutral-300);
+
+  --color-text-primary:   var(--neutral-900);
+  --color-text-secondary: var(--neutral-700);
+  --color-text-muted:     var(--neutral-500);
+  --color-text-inverse:   var(--neutral-0);
+  --color-text-accent:    var(--brand-honey-600);
+
+  --color-accent:        var(--brand-honey-400);
+  --color-accent-hover:  var(--brand-honey-500);
+  --color-accent-text:   var(--brand-ink-700);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text-primary);
+
+  --color-brand-ink:   var(--brand-ink-700);
+  --color-brand-honey: var(--brand-honey-400);
+  --color-brand-cream: var(--brand-cream-50);
+
+  --color-surface:        var(--color-bg-elev-1);
+  --color-surface-strong: var(--color-bg-elev-2);
+  --color-border-default: var(--color-border);
+  --color-border-strong:  var(--color-border-strong);
+
+  --color-text:           var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted:     var(--color-text-muted);
+
+  --color-accent:        var(--color-accent);
+  --color-accent-hover:  var(--color-accent-hover);
+
+  --color-success: var(--color-success-400);
+  --color-warning: var(--color-warning-400);
+  --color-danger:  var(--color-danger-400);
+  --color-info:    var(--color-info-400);
+
+  --font-display: var(--font-display);
+  --font-sans:    var(--font-sans);
+  --font-mono:    var(--font-mono);
+
+  --radius-xs:   var(--radius-xs);
+  --radius-sm:   var(--radius-sm);
+  --radius-md:   var(--radius-md);
+  --radius-lg:   var(--radius-lg);
+  --radius-xl:   var(--radius-xl);
+  --radius-full: var(--radius-full);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
+/* ---------------- Utility-style component classes ----------------
+   Keep small, semantic, opt-in. Don't recreate Tailwind. These are
+   used in big surface elements that recur across pages. */
+
+.cc-card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elev-1);
+}
+
+.cc-card-strong {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg-elev-2);
+}
+
+.cc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.75rem;
+  padding: 0 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: transform var(--duration-fast) var(--ease-out),
+              opacity var(--duration-fast) var(--ease-out),
+              background-color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+
+.cc-btn-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.cc-btn-primary:hover { background: var(--color-accent-hover); }
+.cc-btn-primary:active { transform: translateY(1px); }
+.cc-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.cc-btn-secondary {
+  background: transparent;
+  color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+.cc-btn-secondary:hover { background: var(--color-bg-elev-1); }
+
+.cc-btn-ghost {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+.cc-btn-ghost:hover { background: var(--color-bg-elev-1); }
+
+.cc-input {
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elev-1);
+  color: var(--color-text-primary);
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+.cc-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+.cc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+/* Skeleton loading */
+.cc-skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elev-1);
+}
+.cc-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-text-primary) 8%, transparent),
+    transparent
+  );
+  animation: cc-skeleton 1.4s infinite;
+}
+@keyframes cc-skeleton {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Subtle decorative gradient text used in marketing hero */
+.cc-gradient-text {
+  background: linear-gradient(
+    100deg,
+    var(--brand-honey-400) 0%,
+    var(--brand-honey-200) 50%,
+    var(--brand-honey-400) 100%
+  );
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+  animation: cc-shimmer 6s linear infinite;
+}
+@keyframes cc-shimmer {
+  to { background-position: 200% center; }
+}
+
+/* Coach code highlighting (preserved from previous theme) */
 .coach-code .hljs-keyword,
 .coach-code .hljs-selector-tag,
 .coach-code .hljs-built_in,
@@ -32,7 +310,6 @@ body {
 .coach-code .hljs-tag {
   color: #ffcf7a;
 }
-
 .coach-code .hljs-string,
 .coach-code .hljs-title,
 .coach-code .hljs-section,
@@ -44,14 +321,12 @@ body {
 .coach-code .hljs-addition {
   color: #8ee6b7;
 }
-
 .coach-code .hljs-comment,
 .coach-code .hljs-quote,
 .coach-code .hljs-deletion,
 .coach-code .hljs-meta {
   color: #9fb0d5;
 }
-
 .coach-code .hljs-number,
 .coach-code .hljs-regexp,
 .coach-code .hljs-link,

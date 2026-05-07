@@ -29,3 +29,7 @@ pnpm-debug.log*
 *.pem
 credentials
 
+# Local-only utility configs
+tsconfig.check.json
+deliverables/
+
