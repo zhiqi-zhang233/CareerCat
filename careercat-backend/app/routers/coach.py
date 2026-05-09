@@ -135,6 +135,7 @@ def coach_chat(
             subtype=payload.subtype,
             focus_topic=payload.focus_topic,
             messages=[message.model_dump() for message in payload.messages],
+            locale=payload.locale or "en",
         )
     except Exception as exc:
         record_agent_run(

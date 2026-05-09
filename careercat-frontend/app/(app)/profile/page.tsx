@@ -10,6 +10,7 @@ import {
   updateProfile,
 } from "@/lib/api";
 import type { ParsedResumeResponse, UserProfile } from "@/lib/types";
+import { useT } from "@/lib/i18n/LocaleProvider";
 import { useLocalUserId } from "@/lib/useLocalUserId";
 
 type EducationEntry = {
@@ -41,6 +42,7 @@ type ProjectEntry = {
 export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const t = useT();
   const userId = useLocalUserId();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -103,7 +105,7 @@ export default function ProfilePage() {
 
     if (!parsedFullName && !parsedEmail) {
       alert(
-        "We could not detect both name and email from this resume. Please provide a more complete resume before continuing."
+        t("app.profile.errMissingNameEmailParsed")
       );
       return false;
     }
@@ -164,7 +166,7 @@ export default function ProfilePage() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (!userId) {
-      alert("Local account is still loading. Please try again in a moment.");
+      alert(t("app.profile.errAccountLoadingMoment"));
       return;
     }
 
@@ -178,7 +180,7 @@ export default function ProfilePage() {
     const isAllowed = allowed.some((ext) => lowerName.endsWith(ext));
 
     if (!isAllowed) {
-      alert("Please upload a TXT, PDF, or DOCX file.");
+      alert(t("app.profile.errFileType"));
       event.target.value = "";
       return;
     }
@@ -193,7 +195,7 @@ export default function ProfilePage() {
         const ok = applyParsedData(data);
         if (ok) {
           alert(
-            "Resume parsed successfully. Review the fields and click Update Profile to save these changes."
+            t("app.profile.msgResumeParsed")
           );
         }
       } else {
@@ -201,13 +203,13 @@ export default function ProfilePage() {
         const ok = applyParsedData(data);
         if (ok) {
           alert(
-            "Resume parsed successfully. Review the fields and click Update Profile to save these changes."
+            t("app.profile.msgResumeParsed")
           );
         }
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to parse uploaded file.");
+      alert(t("app.profile.errFileParse"));
     } finally {
       setParsing(false);
       event.target.value = "";
@@ -216,12 +218,12 @@ export default function ProfilePage() {
 
   const handleParse = async () => {
     if (!userId) {
-      alert("Local account is still loading. Please try again in a moment.");
+      alert(t("app.profile.errAccountLoadingMoment"));
       return;
     }
 
     if (!resume.trim()) {
-      alert("Please paste your resume or upload a file first.");
+      alert(t("app.profile.errResumeRequiredForParse"));
       return;
     }
 
@@ -231,12 +233,12 @@ export default function ProfilePage() {
       const ok = applyParsedData(data);
       if (ok) {
         alert(
-          "Resume parsed successfully. Review the fields and click Update Profile to save these changes."
+          t("app.profile.msgResumeParsed")
         );
       }
     } catch (error) {
       console.error(error);
-      alert("Parse failed.");
+      alert(t("app.profile.errParse"));
     } finally {
       setParsing(false);
     }
@@ -307,18 +309,18 @@ export default function ProfilePage() {
 
   const handleSubmit = async () => {
     if (!userId) {
-      alert("Local account is still loading. Please try again in a moment.");
+      alert(t("app.profile.errAccountLoadingMoment"));
       return;
     }
 
     if (!resume.trim()) {
-      alert("Please add your resume first.");
+      alert(t("app.profile.errResumeRequired"));
       return;
     }
 
     if (!fullName.trim() && !email.trim()) {
       alert(
-        "This profile is missing both name and email. Please parse or complete your resume information first."
+        t("app.profile.errMissingNameEmailProfile")
       );
       return;
     }
@@ -350,62 +352,64 @@ export default function ProfilePage() {
       if (profileExists) {
         await updateProfile(userId, payload);
         setHasUnsavedChanges(false);
-        alert("Profile updated!");
+        alert(t("app.profile.msgUpdated"));
       } else {
         await createProfile(payload);
         setProfileExists(true);
         setHasUnsavedChanges(false);
-        alert("Profile saved!");
+        alert(t("app.profile.msgSaved"));
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to save profile.");
+      alert(t("app.profile.errSave"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#011A55] text-white">
+    <main className="min-h-screen text-[var(--color-text-primary)]">
       <Header />
 
       <section className="mx-auto max-w-6xl px-6 py-16">
-        <h1 className="text-4xl font-bold text-[#FFB238]">Profile Setup</h1>
-        <p className="mt-2 text-slate-300">
-          Paste your resume or upload a TXT, PDF, or DOCX file to generate your
-          structured profile.
+        <h1 className="text-4xl font-bold text-[var(--color-text-accent)]">
+          {t("app.profile.title")}
+        </h1>
+        <p className="mt-2 text-[var(--color-text-secondary)]">
+          {t("app.profile.subtitle")}
         </p>
 
         {loadingProfile && (
-          <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4 text-slate-300">
-            Loading saved profile...
+          <div className="mt-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4 text-[var(--color-text-secondary)]">
+            {t("app.profile.loadingProfile")}
           </div>
         )}
 
         {!loadingProfile && profileExists && (
-          <div className="mt-6 rounded-xl border border-[#FFB238]/30 bg-[#FFB238]/10 p-4 text-[#FFB238]">
-            Existing profile loaded successfully.
+          <div className="mt-6 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 p-4 text-[var(--color-text-accent)]">
+            {t("app.profile.loadedProfile")}
           </div>
         )}
 
         {hasUnsavedChanges && (
-          <div className="mt-6 rounded-xl border border-[#FFB238]/40 bg-[#FFB238]/10 p-4 text-sm text-[#FFB238]">
-            You have unsaved profile changes. Click{" "}
-            {profileExists ? "Update Profile" : "Save Profile"} to store them
-            in this local account.
+          <div className="mt-6 rounded-xl border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 p-4 text-sm text-[var(--color-text-accent)]">
+            {t("app.profile.unsavedChanges", {
+              action: profileExists
+                ? t("app.profile.updateProfile")
+                : t("app.profile.saveProfile"),
+            })}
           </div>
         )}
 
-        <div className="mt-10 rounded-2xl border border-[#FFB238]/30 bg-[#FFB238]/10 p-6">
-          <h2 className="text-lg font-semibold text-[#FFB238]">
-            Job Search Settings
+        <div className="mt-10 rounded-2xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 p-6">
+          <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+            {t("app.profile.searchSettings")}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            This setting controls job import warnings and automatic job
-            recommendations.
+          <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
+            {t("app.profile.searchSettingsBody")}
           </p>
 
-          <label className="mt-5 flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
+          <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4 text-sm text-[var(--color-text-secondary)]">
             <input
               type="checkbox"
               className="mt-1"
@@ -416,28 +420,28 @@ export default function ProfilePage() {
               }}
             />
             <span>
-              I need visa sponsorship for jobs in the United States.
-              <span className="mt-1 block text-slate-400">
-                If enabled, CareerCat will warn before saving jobs that clearly
-                do not sponsor, and it will filter those jobs out of discovery
-                recommendations.
+              {t("app.profile.sponsorshipNeed")}
+              <span className="mt-1 block text-[var(--color-text-muted)]">
+                {t("app.profile.sponsorshipHelp")}
               </span>
             </span>
           </label>
         </div>
 
-        <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-[#FFB238]">Resume Input</h2>
+        <div className="mt-10 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+            {t("app.profile.resumeInput")}
+          </h2>
 
           <textarea
-            className="mt-4 w-full rounded-xl border border-white/10 bg-white/10 p-4 text-white placeholder-slate-400 focus:outline-none"
+            className="mt-4 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-4 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
             rows={10}
             value={resume}
             onChange={(e) => {
               setResume(e.target.value);
               markUnsaved();
             }}
-            placeholder="Paste resume here..."
+            placeholder={t("app.profile.resumePlaceholder")}
           />
 
           <input
@@ -452,130 +456,140 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={handleChooseFile}
-              className="rounded-lg border border-[#FFB238]/40 bg-white/5 px-4 py-2 text-[#FFB238] hover:bg-white/10 transition"
+              className="rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-bg-elev-1)] px-4 py-2 text-[var(--color-text-accent)] hover:bg-[var(--color-bg-elev-2)] transition"
             >
-              {parsing ? "Processing..." : "Upload Resume File"}
+              {parsing ? t("app.profile.processing") : t("app.profile.uploadResume")}
             </button>
 
             <button
               type="button"
               onClick={handleParse}
-              className="rounded-lg bg-[#FFB238] px-4 py-2 font-medium text-[#011A55] hover:opacity-90 transition"
+              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 font-medium text-[#011A55] hover:opacity-90 transition"
             >
-              {parsing ? "Parsing..." : "Parse Resume"}
+              {parsing ? t("app.profile.parsing") : t("app.profile.parseResume")}
             </button>
           </div>
 
           {selectedFileName && (
-            <p className="mt-3 text-sm text-slate-300">
-              Selected file: {selectedFileName}
+            <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+              {t("app.profile.selectedFile", { name: selectedFileName })}
             </p>
           )}
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-[#FFB238]">Basic Info</h2>
+        <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+            {t("app.profile.basicInfo")}
+          </h2>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm text-slate-300">
-                Full Name
+              <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                {t("app.profile.fullName")}
               </label>
               <input
-                className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                 value={fullName}
                 onChange={(e) => {
                   setFullName(e.target.value);
                   markUnsaved();
                 }}
-                placeholder="Full Name"
+                placeholder={t("app.profile.fullName")}
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-slate-300">Email</label>
+              <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                {t("app.profile.email")}
+              </label>
               <input
-                className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   markUnsaved();
                 }}
-                placeholder="Email"
+                placeholder={t("app.profile.email")}
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-slate-300">Phone</label>
+              <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                {t("app.profile.phone")}
+              </label>
               <input
-                className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                 value={phone}
                 onChange={(e) => {
                   setPhone(e.target.value);
                   markUnsaved();
                 }}
-                placeholder="Phone"
+                placeholder={t("app.profile.phone")}
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-slate-300">
-                Location
+              <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                {t("app.profile.location")}
               </label>
               <input
-                className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                 value={location}
                 onChange={(e) => {
                   setLocation(e.target.value);
                   markUnsaved();
                 }}
-                placeholder="Location"
+                placeholder={t("app.profile.location")}
               />
             </div>
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#FFB238]">Education</h2>
+            <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+              {t("app.profile.education")}
+            </h2>
             <button
               type="button"
               onClick={addEducation}
-              className="rounded-lg border border-[#FFB238]/40 px-3 py-1 text-sm text-[#FFB238] hover:bg-white/10 transition"
+              className="rounded-lg border border-[var(--color-accent)]/40 px-3 py-1 text-sm text-[var(--color-text-accent)] hover:bg-[var(--color-bg-elev-2)] transition"
             >
-              Add
+              {t("app.profile.add")}
             </button>
           </div>
 
           <div className="mt-4 space-y-4">
             {education.length === 0 ? (
-              <p className="text-sm text-slate-400">No education parsed yet.</p>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {t("app.profile.noEducation")}
+              </p>
             ) : (
               education.map((item, index) => (
                 <div
                   key={index}
-                  className="rounded-xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4"
                 >
                   <div className="mb-4 flex items-center justify-between">
-                    <p className="text-sm font-medium text-slate-300">
-                      Education #{index + 1}
+                    <p className="text-sm font-medium text-[var(--color-text-secondary)]">
+                      {t("app.profile.educationItem", { n: index + 1 })}
                     </p>
                     <button
                       type="button"
                       onClick={() => removeEducation(index)}
-                      className="rounded-lg border border-red-400/40 px-3 py-1 text-sm text-red-300 hover:bg-red-500/10 transition"
+                      className="rounded-lg border border-red-400/40 px-3 py-1 text-sm text-red-300 hover:bg-[var(--color-danger-bg)] transition"
                     >
-                      Delete
+                      {t("app.profile.delete")}
                     </button>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        School Name
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.schoolName")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.school_name}
                         onChange={(e) =>
                           updateEducation(index, "school_name", e.target.value)
@@ -584,11 +598,11 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        Degree
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.degree")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.degree}
                         onChange={(e) =>
                           updateEducation(index, "degree", e.target.value)
@@ -597,11 +611,11 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        Major
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.major")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.major}
                         onChange={(e) =>
                           updateEducation(index, "major", e.target.value)
@@ -611,11 +625,11 @@ export default function ProfilePage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="mb-2 block text-sm text-slate-300">
-                          Start Date
+                        <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                          {t("app.profile.startDate")}
                         </label>
                         <input
-                          className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                          className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                           value={item.start_date}
                           onChange={(e) =>
                             updateEducation(index, "start_date", e.target.value)
@@ -624,11 +638,11 @@ export default function ProfilePage() {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm text-slate-300">
-                          End Date
+                        <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                          {t("app.profile.endDate")}
                         </label>
                         <input
-                          className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                          className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                           value={item.end_date}
                           onChange={(e) =>
                             updateEducation(index, "end_date", e.target.value)
@@ -639,12 +653,12 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="mt-4">
-                    <label className="mb-2 block text-sm text-slate-300">
-                      Details
+                    <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                      {t("app.profile.details")}
                     </label>
                     <textarea
                       rows={4}
-                      className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                       value={item.details}
                       onChange={(e) =>
                         updateEducation(index, "details", e.target.value)
@@ -657,49 +671,51 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#FFB238]">
-              Experience
+            <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+              {t("app.profile.experience")}
             </h2>
             <button
               type="button"
               onClick={addExperience}
-              className="rounded-lg border border-[#FFB238]/40 px-3 py-1 text-sm text-[#FFB238] hover:bg-white/10 transition"
+              className="rounded-lg border border-[var(--color-accent)]/40 px-3 py-1 text-sm text-[var(--color-text-accent)] hover:bg-[var(--color-bg-elev-2)] transition"
             >
-              Add
+              {t("app.profile.add")}
             </button>
           </div>
 
           <div className="mt-4 space-y-4">
             {experiences.length === 0 ? (
-              <p className="text-sm text-slate-400">No experience parsed yet.</p>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {t("app.profile.noExperience")}
+              </p>
             ) : (
               experiences.map((item, index) => (
                 <div
                   key={index}
-                  className="rounded-xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4"
                 >
                   <div className="mb-4 flex items-center justify-between">
-                    <p className="text-sm font-medium text-slate-300">
-                      Experience #{index + 1}
+                    <p className="text-sm font-medium text-[var(--color-text-secondary)]">
+                      {t("app.profile.experienceItem", { n: index + 1 })}
                     </p>
                     <button
                       type="button"
                       onClick={() => removeExperience(index)}
-                      className="rounded-lg border border-red-400/40 px-3 py-1 text-sm text-red-300 hover:bg-red-500/10 transition"
+                      className="rounded-lg border border-red-400/40 px-3 py-1 text-sm text-red-300 hover:bg-[var(--color-danger-bg)] transition"
                     >
-                      Delete
+                      {t("app.profile.delete")}
                     </button>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        Company Name
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.companyName")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.company_name}
                         onChange={(e) =>
                           updateExperience(index, "company_name", e.target.value)
@@ -708,11 +724,11 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        Employment Type
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.employmentType")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.employment_type}
                         onChange={(e) =>
                           updateExperience(
@@ -725,11 +741,11 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        Job Title
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.jobTitle")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.job_title}
                         onChange={(e) =>
                           updateExperience(index, "job_title", e.target.value)
@@ -739,11 +755,11 @@ export default function ProfilePage() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="mb-2 block text-sm text-slate-300">
-                          Start Date
+                        <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                          {t("app.profile.startDate")}
                         </label>
                         <input
-                          className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                          className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                           value={item.start_date}
                           onChange={(e) =>
                             updateExperience(index, "start_date", e.target.value)
@@ -752,11 +768,11 @@ export default function ProfilePage() {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm text-slate-300">
-                          End Date
+                        <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                          {t("app.profile.endDate")}
                         </label>
                         <input
-                          className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                          className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                           value={item.end_date}
                           onChange={(e) =>
                             updateExperience(index, "end_date", e.target.value)
@@ -767,12 +783,12 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="mt-4">
-                    <label className="mb-2 block text-sm text-slate-300">
-                      Details
+                    <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                      {t("app.profile.details")}
                     </label>
                     <textarea
                       rows={5}
-                      className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                       value={item.details}
                       onChange={(e) =>
                         updateExperience(index, "details", e.target.value)
@@ -785,47 +801,51 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#FFB238]">Projects</h2>
+            <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+              {t("app.profile.projects")}
+            </h2>
             <button
               type="button"
               onClick={addProject}
-              className="rounded-lg border border-[#FFB238]/40 px-3 py-1 text-sm text-[#FFB238] hover:bg-white/10 transition"
+              className="rounded-lg border border-[var(--color-accent)]/40 px-3 py-1 text-sm text-[var(--color-text-accent)] hover:bg-[var(--color-bg-elev-2)] transition"
             >
-              Add
+              {t("app.profile.add")}
             </button>
           </div>
 
           <div className="mt-4 space-y-4">
             {projects.length === 0 ? (
-              <p className="text-sm text-slate-400">No projects parsed yet.</p>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {t("app.profile.noProjects")}
+              </p>
             ) : (
               projects.map((item, index) => (
                 <div
                   key={index}
-                  className="rounded-xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4"
                 >
                   <div className="mb-4 flex items-center justify-between">
-                    <p className="text-sm font-medium text-slate-300">
-                      Project #{index + 1}
+                    <p className="text-sm font-medium text-[var(--color-text-secondary)]">
+                      {t("app.profile.projectItem", { n: index + 1 })}
                     </p>
                     <button
                       type="button"
                       onClick={() => removeProject(index)}
-                      className="rounded-lg border border-red-400/40 px-3 py-1 text-sm text-red-300 hover:bg-red-500/10 transition"
+                      className="rounded-lg border border-red-400/40 px-3 py-1 text-sm text-red-300 hover:bg-[var(--color-danger-bg)] transition"
                     >
-                      Delete
+                      {t("app.profile.delete")}
                     </button>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        Project Name
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.projectName")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.project_name}
                         onChange={(e) =>
                           updateProject(index, "project_name", e.target.value)
@@ -834,11 +854,11 @@ export default function ProfilePage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-sm text-slate-300">
-                        Project Role
+                      <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                        {t("app.profile.projectRole")}
                       </label>
                       <input
-                        className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={item.project_role}
                         onChange={(e) =>
                           updateProject(index, "project_role", e.target.value)
@@ -848,11 +868,11 @@ export default function ProfilePage() {
 
                     <div className="grid grid-cols-2 gap-4 md:col-span-2">
                       <div>
-                        <label className="mb-2 block text-sm text-slate-300">
-                          Start Date
+                        <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                          {t("app.profile.startDate")}
                         </label>
                         <input
-                          className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                          className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                           value={item.start_date}
                           onChange={(e) =>
                             updateProject(index, "start_date", e.target.value)
@@ -861,11 +881,11 @@ export default function ProfilePage() {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm text-slate-300">
-                          End Date
+                        <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                          {t("app.profile.endDate")}
                         </label>
                         <input
-                          className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                          className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                           value={item.end_date}
                           onChange={(e) =>
                             updateProject(index, "end_date", e.target.value)
@@ -876,12 +896,12 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="mt-4">
-                    <label className="mb-2 block text-sm text-slate-300">
-                      Details
+                    <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+                      {t("app.profile.details")}
                     </label>
                     <textarea
                       rows={5}
-                      className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                       value={item.details}
                       onChange={(e) =>
                         updateProject(index, "details", e.target.value)
@@ -894,30 +914,36 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-[#FFB238]">Skills</h2>
+        <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+            {t("app.profile.skills")}
+          </h2>
 
           <div className="mt-4">
-            <label className="mb-2 block text-sm text-slate-300">
-              Skills
+            <label className="mb-2 block text-sm text-[var(--color-text-secondary)]">
+              {t("app.profile.skills")}
             </label>
             <input
-              className="w-full rounded-xl border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+              className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
               value={skills}
               onChange={(e) => {
                 setSkills(e.target.value);
                 markUnsaved();
               }}
-              placeholder="Python, SQL, Machine Learning..."
+              placeholder={t("app.profile.skillsPlaceholder")}
             />
           </div>
         </div>
 
         <button
           onClick={handleSubmit}
-          className="mt-8 w-full rounded-xl bg-[#FFB238] py-3 font-semibold text-[#011A55] hover:opacity-90 transition"
+          className="mt-8 w-full rounded-xl bg-[var(--color-accent)] py-3 font-semibold text-[#011A55] hover:opacity-90 transition"
         >
-          {loading ? "Saving..." : profileExists ? "Update Profile" : "Save Profile"}
+          {loading
+            ? t("app.profile.saving")
+            : profileExists
+              ? t("app.profile.updateProfile")
+              : t("app.profile.saveProfile")}
         </button>
       </section>
     </main>

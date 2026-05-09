@@ -33,16 +33,23 @@ import type {
   CoachSession,
   JobPost,
 } from "@/lib/types";
+import { useT } from "@/lib/i18n/LocaleProvider";
 import { useLocalUserId } from "@/lib/useLocalUserId";
 
 type JobsResponse = {
   jobs?: JobPost[];
 };
 
-const MODE_LABELS: Record<CoachMode, string> = {
-  gap_analysis: "Resume and Job Gap",
-  mock_interview: "Mock Interview",
-  written_practice: "Written Assessment",
+type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+function readJobs(data: JobsResponse | null | undefined): JobPost[] {
+  return Array.isArray(data?.jobs) ? data.jobs : [];
+}
+
+const MODE_LABEL_KEYS: Record<CoachMode, string> = {
+  gap_analysis: "app.coach.modeGap",
+  mock_interview: "app.coach.modeMock",
+  written_practice: "app.coach.modeWritten",
 };
 
 const CODE_LANGUAGES = [
@@ -97,6 +104,7 @@ hljs.registerLanguage("xml", xml);
 hljs.registerLanguage("yaml", yaml);
 
 export default function CoachPage() {
+  const t = useT();
   const userId = useLocalUserId();
   const [sessions, setSessions] = useState<CoachSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState("");
@@ -130,9 +138,10 @@ export default function CoachPage() {
 
       setSessions(nextSessions);
       setActiveSessionId(nextSessions[0]?.session_id || "");
-    } catch (loadError) {
-      console.error(loadError);
-      setError("Coach history could not be loaded from your account.");
+    } catch {
+      const localSessions = await migrateLocalCoachSessions(userId);
+      setSessions(localSessions);
+      setActiveSessionId(localSessions[0]?.session_id || "");
     } finally {
       setSessionsLoading(false);
     }
@@ -174,12 +183,12 @@ export default function CoachPage() {
 
     try {
       const data = (await fetchUserJobs(userId)) as JobsResponse;
-      const savedJobs = data.jobs || [];
+      const savedJobs = readJobs(data);
       setJobs(savedJobs);
       setSelectedJobId((current) => current || savedJobs[0]?.job_id || "");
-    } catch (loadError) {
-      console.error(loadError);
-      setError("Failed to load dashboard jobs.");
+    } catch {
+      setJobs([]);
+      setSelectedJobId("");
     }
   }, [userId]);
 
@@ -202,23 +211,23 @@ export default function CoachPage() {
       await saveCoachSession(nextSession);
     } catch (saveError) {
       console.error(saveError);
-      setError("Coach history could not be saved to your account.");
+      setError(t("app.coach.errHistorySave"));
     }
   };
 
   const startSession = async () => {
     if (!userId) {
-      setError("Local account is still loading. Please try again.");
+      setError(t("app.coach.errAccountLoading"));
       return;
     }
 
     if (mode === "gap_analysis" && !selectedJobId) {
-      setError("Choose a dashboard job for gap analysis.");
+      setError(t("app.coach.errChooseJob"));
       return;
     }
 
     if (mode !== "gap_analysis" && !focusTopic.trim()) {
-      setError("Add a focus topic before starting.");
+      setError(t("app.coach.errFocusTopic"));
       return;
     }
 
@@ -226,13 +235,19 @@ export default function CoachPage() {
     const now = new Date().toISOString();
     const title =
       mode === "gap_analysis"
-        ? `Gap: ${selectedJob?.title || "Selected job"}`
-        : `${MODE_LABELS[mode]}: ${focusTopic}`;
+        ? t("app.coach.gapTitle", {
+            title: selectedJob?.title || t("app.coach.selectedJob"),
+          })
+        : t("app.coach.sessionTitle", {
+            mode: modeLabel(mode, t),
+            topic: focusTopic,
+          });
     const openingMessage = buildOpeningMessage(
       mode,
       subtype,
       selectedJob,
-      focusTopic
+      focusTopic,
+      t
     );
 
     const nextSession: CoachSession = {
@@ -282,7 +297,7 @@ export default function CoachPage() {
       await persistSession(updatedSession);
     } catch (chatError) {
       console.error(chatError);
-      setError("Coach failed to respond. Please try again.");
+      setError(t("app.coach.errRespond"));
     } finally {
       setLoading(false);
     }
@@ -323,34 +338,36 @@ export default function CoachPage() {
       await deleteCoachSession(userId, sessionId);
     } catch (deleteError) {
       console.error(deleteError);
-      setError("Coach history could not be deleted from your account.");
+      setError(t("app.coach.errHistoryDelete"));
       loadCoachSessions();
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#011A55] text-white">
+    <main className="min-h-screen text-[var(--color-text-primary)]">
       <Header />
 
       <section className="mx-auto grid max-w-7xl gap-6 px-6 py-10 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="rounded-lg border border-white/10 bg-white/5 p-4">
+        <aside className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-[#FFB238]">Coach History</h2>
+            <h2 className="font-semibold text-[var(--color-text-accent)]">
+              {t("app.coach.history")}
+            </h2>
             <button
               type="button"
               onClick={() => setActiveSessionId("")}
-              className="rounded-lg border border-[#FFB238]/40 px-3 py-1 text-xs text-[#FFB238] hover:bg-white/10"
+              className="rounded-lg border border-[var(--color-accent)]/40 px-3 py-1 text-xs text-[var(--color-text-accent)] hover:bg-[var(--color-bg-elev-2)]"
             >
-              New
+              {t("app.coach.new")}
             </button>
           </div>
 
           <div className="mt-4 space-y-2">
             {sessions.length === 0 ? (
-              <p className="text-sm leading-6 text-slate-400">
+              <p className="text-sm leading-6 text-[var(--color-text-muted)]">
                 {sessionsLoading
-                  ? "Loading coach history..."
-                  : "Past chats will appear here across your devices."}
+                  ? t("app.coach.loadingHistory")
+                  : t("app.coach.emptyHistory")}
               </p>
             ) : (
               sessions.map((session) => (
@@ -360,15 +377,15 @@ export default function CoachPage() {
                   onClick={() => setActiveSessionId(session.session_id)}
                   className={`w-full rounded-lg border p-3 text-left transition ${
                     activeSessionId === session.session_id
-                      ? "border-[#FFB238]/50 bg-[#FFB238]/10"
-                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                      ? "border-[var(--color-accent)]/50 bg-[var(--color-accent)]/10"
+                      : "border-[var(--color-border)] bg-[var(--color-bg-elev-1)] hover:bg-[var(--color-bg-elev-2)]"
                   }`}
                 >
-                  <p className="line-clamp-2 text-sm font-medium text-white">
+                  <p className="line-clamp-2 text-sm font-medium text-[var(--color-text-primary)]">
                     {session.title}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {MODE_LABELS[session.mode]}
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    {modeLabel(session.mode, t)}
                   </p>
                 </button>
               ))
@@ -376,57 +393,55 @@ export default function CoachPage() {
           </div>
         </aside>
 
-        <section className="min-h-[720px] rounded-lg border border-white/10 bg-white/5">
+        <section className="min-h-[720px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)]">
           {!activeSession ? (
             <div className="p-6">
-              <p className="text-sm font-medium text-[#FFB238]">
-                AI Career Coach
+              <p className="text-sm font-medium text-[var(--color-text-accent)]">
+                {t("app.coach.eyebrow")}
               </p>
-              <h1 className="mt-3 text-4xl font-bold text-[#FFB238]">
-                Start a Coaching Session
+              <h1 className="mt-3 text-4xl font-bold text-[var(--color-text-accent)]">
+                {t("app.coach.title")}
               </h1>
-              <p className="mt-4 max-w-3xl text-slate-300">
-                Choose your goal. CareerCat can compare your resume with a saved
-                job, run technical or behavioral interview simulations, or train
-                you for written assessments.
+              <p className="mt-4 max-w-3xl text-[var(--color-text-secondary)]">
+                {t("app.coach.subtitle")}
               </p>
 
               <div className="mt-8 grid gap-4 md:grid-cols-3">
                 <ModeCard
                   active={mode === "gap_analysis"}
-                  title="Resume and Job Gap"
-                  body="Improve resume positioning and close skill gaps for a saved job."
+                  title={t("app.coach.modeGap")}
+                  body={t("app.coach.modeGapBody")}
                   onClick={() => setMode("gap_analysis")}
                 />
                 <ModeCard
                   active={mode === "mock_interview"}
-                  title="Mock Interview"
-                  body="Practice technical or behavioral interviews one question at a time."
+                  title={t("app.coach.modeMock")}
+                  body={t("app.coach.modeMockBody")}
                   onClick={() => setMode("mock_interview")}
                 />
                 <ModeCard
                   active={mode === "written_practice"}
-                  title="Written Assessment"
-                  body="Train on skills, concepts, and written coding or analytics tasks."
+                  title={t("app.coach.modeWritten")}
+                  body={t("app.coach.modeWrittenBody")}
                   onClick={() => setMode("written_practice")}
                 />
               </div>
 
-              <div className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5">
+              <div className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-5">
                 {mode === "gap_analysis" && (
-                  <label className="text-sm text-slate-300">
-                    Choose a Dashboard job
+                  <label className="text-sm text-[var(--color-text-secondary)]">
+                    {t("app.coach.chooseJob")}
                     <select
-                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                      className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                       value={selectedJobId}
                       onChange={(event) => setSelectedJobId(event.target.value)}
                     >
                       {jobs.length === 0 ? (
-                        <option value="">No saved jobs yet</option>
+                        <option value="">{t("app.coach.noSavedJobs")}</option>
                       ) : (
                         jobs.map((job) => (
                           <option key={job.job_id} value={job.job_id}>
-                            {job.title} · {job.company || "Unknown company"}
+                            {job.title} · {job.company || t("app.coach.unknownCompany")}
                           </option>
                         ))
                       )}
@@ -436,23 +451,23 @@ export default function CoachPage() {
 
                 {mode === "mock_interview" && (
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="text-sm text-slate-300">
-                      Interview type
+                    <label className="text-sm text-[var(--color-text-secondary)]">
+                      {t("app.coach.interviewType")}
                       <select
-                        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                         value={subtype}
                         onChange={(event) => setSubtype(event.target.value)}
                       >
-                        <option value="technical">Technical</option>
-                        <option value="behavioral">Behavioral</option>
+                        <option value="technical">{t("app.coach.technical")}</option>
+                        <option value="behavioral">{t("app.coach.behavioral")}</option>
                       </select>
                     </label>
 
-                    <label className="text-sm text-slate-300">
-                      Focus
+                    <label className="text-sm text-[var(--color-text-secondary)]">
+                      {t("app.coach.focus")}
                       <input
-                        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
-                        placeholder="Python, SQL, ML systems, STAR stories..."
+                        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+                        placeholder={t("app.coach.focusPlaceholder")}
                         value={focusTopic}
                         onChange={(event) => setFocusTopic(event.target.value)}
                       />
@@ -461,11 +476,11 @@ export default function CoachPage() {
                 )}
 
                 {mode === "written_practice" && (
-                  <label className="text-sm text-slate-300">
-                    Skill or topic
+                  <label className="text-sm text-[var(--color-text-secondary)]">
+                    {t("app.coach.skillTopic")}
                     <input
-                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
-                      placeholder="SQL joins, pandas, statistics, algorithms..."
+                      className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+                      placeholder={t("app.coach.skillPlaceholder")}
                       value={focusTopic}
                       onChange={(event) => setFocusTopic(event.target.value)}
                     />
@@ -476,9 +491,9 @@ export default function CoachPage() {
                   type="button"
                   onClick={startSession}
                   disabled={loading}
-                  className="mt-5 rounded-lg bg-[#FFB238] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-5 rounded-lg bg-[var(--color-accent)] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? "Starting..." : "Start Chat"}
+                  {loading ? t("app.coach.starting") : t("app.coach.startChat")}
                 </button>
               </div>
 
@@ -486,22 +501,22 @@ export default function CoachPage() {
             </div>
           ) : (
             <div className="flex min-h-[720px] flex-col">
-              <div className="border-b border-white/10 p-5">
+              <div className="border-b border-[var(--color-border)] p-5">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="text-xs uppercase text-slate-400">
-                      {MODE_LABELS[activeSession.mode]}
+                    <p className="text-xs uppercase text-[var(--color-text-muted)]">
+                      {modeLabel(activeSession.mode, t)}
                     </p>
-                    <h1 className="mt-1 text-2xl font-bold text-[#FFB238]">
+                    <h1 className="mt-1 text-2xl font-bold text-[var(--color-text-accent)]">
                       {activeSession.title}
                     </h1>
                   </div>
                   <button
                     type="button"
                     onClick={() => deleteSession(activeSession.session_id)}
-                    className="rounded-lg border border-red-300/40 px-3 py-2 text-sm text-red-100 hover:bg-red-500/10"
+                    className="rounded-lg border border-[var(--color-danger-border)] px-3 py-2 text-sm text-[var(--color-danger-text)] hover:bg-[var(--color-danger-bg)]"
                   >
-                    Delete Chat
+                    {t("app.coach.deleteChat")}
                   </button>
                 </div>
               </div>
@@ -514,18 +529,18 @@ export default function CoachPage() {
                   />
                 ))}
                 {loading && (
-                  <div className="rounded-lg border border-[#FFB238]/30 bg-[#FFB238]/10 p-4 text-sm text-[#FFB238]">
-                    Coach is thinking...
+                  <div className="rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 p-4 text-sm text-[var(--color-text-accent)]">
+                    {t("app.coach.thinking")}
                   </div>
                 )}
               </div>
 
               {error && <ErrorBox message={error} />}
 
-              <div className="border-t border-white/10 p-5">
+              <div className="border-t border-[var(--color-border)] p-5">
                 <textarea
-                  className="min-h-28 w-full rounded-lg border border-white/10 bg-white/10 p-4 text-white placeholder-slate-400 focus:outline-none"
-                  placeholder="Answer the question, ask for a hint, or request another practice problem..."
+                  className="min-h-28 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-4 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+                  placeholder={t("app.coach.replyPlaceholder")}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                 />
@@ -534,9 +549,9 @@ export default function CoachPage() {
                     type="button"
                     onClick={sendMessage}
                     disabled={loading || !draft.trim()}
-                    className="rounded-lg bg-[#FFB238] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-[var(--color-accent)] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Send
+                    {t("app.coach.send")}
                   </button>
                 </div>
               </div>
@@ -552,20 +567,51 @@ function buildOpeningMessage(
   mode: CoachMode,
   subtype: string,
   job?: JobPost,
-  focusTopic?: string
+  focusTopic?: string,
+  t?: Translate
 ) {
   if (mode === "gap_analysis") {
-    return `Analyze my resume/profile against this saved job: ${job?.title || ""}. Please tell me how to improve my resume and which skills I need to close.`;
+    return (t || fallbackT)("app.coach.openingGap", {
+      title: job?.title || "",
+    });
   }
 
   if (mode === "mock_interview") {
     if (subtype === "behavioral") {
-      return `Start a behavioral mock interview focused on ${focusTopic}. Ask one question at a time and score my answers.`;
+      return (t || fallbackT)("app.coach.openingBehavioral", {
+        topic: focusTopic || "",
+      });
     }
-    return `Start a technical mock interview focused on ${focusTopic}. Ask one technical question at a time, score my answer, and move to the next question when I am ready.`;
+    return (t || fallbackT)("app.coach.openingTechnical", {
+      topic: focusTopic || "",
+    });
   }
 
-  return `Start written assessment training for ${focusTopic}. Teach the key concept, give me a practice problem, and coach me through my answer.`;
+  return (t || fallbackT)("app.coach.openingWritten", {
+    topic: focusTopic || "",
+  });
+}
+
+function modeLabel(mode: CoachMode, t: Translate) {
+  return t(MODE_LABEL_KEYS[mode]);
+}
+
+function fallbackT(key: string, params?: Record<string, string | number>) {
+  const fallbacks: Record<string, string> = {
+    "app.coach.openingGap":
+      "Analyze my resume/profile against this saved job: {title}. Please tell me how to improve my resume and which skills I need to close.",
+    "app.coach.openingBehavioral":
+      "Start a behavioral mock interview focused on {topic}. Ask one question at a time and score my answers.",
+    "app.coach.openingTechnical":
+      "Start a technical mock interview focused on {topic}. Ask one technical question at a time, score my answer, and move to the next question when I am ready.",
+    "app.coach.openingWritten":
+      "Start written assessment training for {topic}. Teach the key concept, give me a practice problem, and coach me through my answer.",
+  };
+  const template = fallbacks[key] || key;
+  return template.replace(/\{(\w+)\}/g, (match, name) => {
+    const value = params?.[name];
+    return value === undefined || value === null ? match : String(value);
+  });
 }
 
 async function migrateLocalCoachSessions(userId: string) {
@@ -584,16 +630,19 @@ async function migrateLocalCoachSessions(userId: string) {
       .map((session) => normalizeCoachSession(userId, session))
       .filter((session): session is CoachSession => Boolean(session));
 
-    await Promise.all(sessions.map((session) => saveCoachSession(session)));
-    window.localStorage.removeItem(storageKey);
+    const migrationResults = await Promise.allSettled(
+      sessions.map((session) => saveCoachSession(session))
+    );
+    if (migrationResults.every((result) => result.status === "fulfilled")) {
+      window.localStorage.removeItem(storageKey);
+    }
 
     return sessions.sort((first, second) =>
       (second.updated_at || second.created_at || "").localeCompare(
         first.updated_at || first.created_at || ""
       )
     );
-  } catch (migrationError) {
-    console.error(migrationError);
+  } catch {
     return [];
   }
 }
@@ -644,12 +693,12 @@ function ModeCard({
       onClick={onClick}
       className={`rounded-lg border p-5 text-left transition hover:-translate-y-0.5 ${
         active
-          ? "border-[#FFB238]/60 bg-[#FFB238]/10"
-          : "border-white/10 bg-white/5 hover:bg-white/10"
+          ? "border-[var(--color-accent)]/60 bg-[var(--color-accent)]/10"
+          : "border-[var(--color-border)] bg-[var(--color-bg-elev-1)] hover:bg-[var(--color-bg-elev-2)]"
       }`}
     >
-      <h3 className="font-semibold text-[#FFB238]">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-300">{body}</p>
+      <h3 className="font-semibold text-[var(--color-text-accent)]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{body}</p>
     </button>
   );
 }
@@ -662,8 +711,8 @@ function MessageBubble({ message }: { message: CoachMessage }) {
       <div
         className={`max-w-3xl rounded-lg border p-4 text-sm leading-6 ${
           isUser
-            ? "whitespace-pre-wrap border-[#FFB238]/40 bg-[#FFB238]/10 text-white"
-            : "border-white/10 bg-white/10 text-slate-100"
+            ? "whitespace-pre-wrap border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 text-[var(--color-text-primary)]"
+            : "border-[var(--color-border)] bg-[var(--color-bg-elev-2)] text-[var(--color-text-primary)]"
         }`}
       >
         {isUser ? message.content : <CoachMarkdown content={message.content} />}
@@ -703,7 +752,7 @@ function CoachMarkdown({ content }: { content: string }) {
           return (
             <hr
               key={`${block.type}-${blockIndex}`}
-              className="my-4 border-t border-white/15"
+              className="my-4 border-t border-[var(--color-border)]"
             />
           );
         }
@@ -712,7 +761,7 @@ function CoachMarkdown({ content }: { content: string }) {
           return (
             <blockquote
               key={`${block.type}-${blockIndex}`}
-              className="border-l-2 border-[#FFB238]/60 pl-4 text-slate-300"
+              className="border-l-2 border-[var(--color-accent)]/60 pl-4 text-[var(--color-text-secondary)]"
             >
               {renderInline(block.text)}
             </blockquote>
@@ -723,7 +772,7 @@ function CoachMarkdown({ content }: { content: string }) {
           return (
             <ol
               key={`${block.type}-${blockIndex}`}
-              className="list-decimal space-y-1 pl-5 text-slate-100"
+              className="list-decimal space-y-1 pl-5 text-[var(--color-text-primary)]"
             >
               {block.items.map((item, itemIndex) => (
                 <li key={`${blockIndex}-${itemIndex}`}>{renderInline(item)}</li>
@@ -736,7 +785,7 @@ function CoachMarkdown({ content }: { content: string }) {
           return (
             <ul
               key={`${block.type}-${blockIndex}`}
-              className="list-disc space-y-1 pl-5 text-slate-100"
+              className="list-disc space-y-1 pl-5 text-[var(--color-text-primary)]"
             >
               {block.items.map((item, itemIndex) => (
                 <li key={`${blockIndex}-${itemIndex}`}>{renderInline(item)}</li>
@@ -750,7 +799,7 @@ function CoachMarkdown({ content }: { content: string }) {
         }
 
         return (
-          <p key={`${block.type}-${blockIndex}`} className="text-slate-100">
+          <p key={`${block.type}-${blockIndex}`} className="text-[var(--color-text-primary)]">
             {renderInline(block.text)}
           </p>
         );
@@ -942,14 +991,14 @@ function HeadingTag({
 
 function headingClassName(level: number) {
   if (level <= 1) {
-    return "pt-2 text-lg font-semibold text-[#FFB238]";
+    return "pt-2 text-lg font-semibold text-[var(--color-text-accent)]";
   }
 
   if (level === 2) {
-    return "pt-2 text-base font-semibold text-[#FFB238]";
+    return "pt-2 text-base font-semibold text-[var(--color-text-accent)]";
   }
 
-  return "pt-1 text-sm font-semibold text-[#FFB238]";
+  return "pt-1 text-sm font-semibold text-[var(--color-text-accent)]";
 }
 
 function CodeBlock({
@@ -957,19 +1006,26 @@ function CodeBlock({
 }: {
   block: Extract<MarkdownBlock, { type: "code" }>;
 }) {
-  const highlightedCode = highlightCode(block.text, block.language);
+  const t = useT();
+  const highlightedCode = highlightCode(
+    block.text,
+    block.language,
+    t("app.coach.code")
+  );
 
   return (
-    <div className="overflow-hidden rounded-lg border border-white/10 bg-[#06143D]">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
-        <span className="text-xs uppercase tracking-wide text-slate-400">
+    <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[#06143D]">
+      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
+        <span className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
           {highlightedCode.label}
         </span>
         {highlightedCode.detected && (
-          <span className="text-xs text-slate-500">auto-detected</span>
+          <span className="text-xs text-[var(--color-text-muted)]">
+            {t("app.coach.autoDetected")}
+          </span>
         )}
       </div>
-      <pre className="coach-code overflow-x-auto p-4 text-xs leading-6 text-slate-100">
+      <pre className="coach-code overflow-x-auto p-4 text-xs leading-6 text-[var(--color-text-primary)]">
         <code
           className="font-mono"
           dangerouslySetInnerHTML={{ __html: highlightedCode.html }}
@@ -979,7 +1035,7 @@ function CodeBlock({
   );
 }
 
-function highlightCode(text: string, language: string) {
+function highlightCode(text: string, language: string, codeLabel: string) {
   const normalizedLanguage = normalizeCodeLanguage(language);
 
   if (normalizedLanguage && hljs.getLanguage(normalizedLanguage)) {
@@ -1005,13 +1061,13 @@ function highlightCode(text: string, language: string) {
     const result = hljs.highlightAuto(text, CODE_LANGUAGES);
     return {
       html: result.value,
-      label: result.language ? formatLanguageLabel(result.language) : "Code",
+      label: result.language ? formatLanguageLabel(result.language) : codeLabel,
       detected: Boolean(result.language),
     };
   } catch {
     return {
       html: escapeHtml(text),
-      label: "Code",
+      label: codeLabel,
       detected: false,
     };
   }
@@ -1045,7 +1101,7 @@ function formatLanguageLabel(language: string) {
     yaml: "YAML",
   };
 
-  return labels[language] || "Code";
+  return labels[language] || language;
 }
 
 function escapeHtml(text: string) {
@@ -1070,7 +1126,7 @@ function renderInline(text: string) {
       return (
         <code
           key={`${part}-${index}`}
-          className="rounded border border-white/10 bg-[#06143D] px-1.5 py-0.5 font-mono text-[0.85em] text-[#FFCF7A]"
+          className="rounded border border-[var(--color-border)] bg-[#06143D] px-1.5 py-0.5 font-mono text-[0.85em] text-[#FFCF7A]"
         >
           {part.slice(1, -1)}
         </code>
@@ -1079,7 +1135,7 @@ function renderInline(text: string) {
 
     if (part.startsWith("**")) {
       return (
-        <strong key={`${part}-${index}`} className="font-semibold text-white">
+        <strong key={`${part}-${index}`} className="font-semibold text-[var(--color-text-primary)]">
           {stripStrongMarkers(part, "**")}
         </strong>
       );
@@ -1087,7 +1143,7 @@ function renderInline(text: string) {
 
     if (part.startsWith("__") && part.endsWith("__")) {
       return (
-        <strong key={`${part}-${index}`} className="font-semibold text-white">
+        <strong key={`${part}-${index}`} className="font-semibold text-[var(--color-text-primary)]">
           {part.slice(2, -2)}
         </strong>
       );
@@ -1095,7 +1151,7 @@ function renderInline(text: string) {
 
     if (part.startsWith("*") && part.endsWith("*")) {
       return (
-        <em key={`${part}-${index}`} className="italic text-slate-100">
+        <em key={`${part}-${index}`} className="italic text-[var(--color-text-primary)]">
           {part.slice(1, -1)}
         </em>
       );
@@ -1103,7 +1159,7 @@ function renderInline(text: string) {
 
     if (part.startsWith("_") && part.endsWith("_")) {
       return (
-        <em key={`${part}-${index}`} className="italic text-slate-100">
+        <em key={`${part}-${index}`} className="italic text-[var(--color-text-primary)]">
           {part.slice(1, -1)}
         </em>
       );
@@ -1151,7 +1207,7 @@ function normalizeCoachText(text: string) {
 
 function ErrorBox({ message }: { message: string }) {
   return (
-    <div className="m-5 rounded-lg border border-red-300/30 bg-red-500/10 p-4 text-sm text-red-100">
+    <div className="m-5 rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] p-4 text-sm text-[var(--color-danger-text)]">
       {message}
     </div>
   );

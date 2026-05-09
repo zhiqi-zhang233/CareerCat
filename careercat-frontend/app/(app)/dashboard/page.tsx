@@ -6,42 +6,39 @@ import Header from "@/components/Header";
 import { deleteJobPost, fetchUserJobs, updateJobPost } from "@/lib/api";
 import type { JobApplicationStatus, JobPost, JobUpdatePayload } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
+import { useLocale } from "@/lib/i18n/LocaleProvider";
 
-const STATUS_OPTIONS: Array<{
-  value: JobApplicationStatus;
-  label: string;
-  tone: string;
-}> = [
-  {
-    value: "not_applied",
-    label: "Not Applied",
-    tone: "border-slate-400/30 bg-slate-400/10 text-slate-200",
-  },
-  {
-    value: "applied",
-    label: "Applied",
-    tone: "border-blue-300/30 bg-blue-400/10 text-blue-100",
-  },
-  {
-    value: "assessment",
-    label: "Assessment",
-    tone: "border-[#FFB238]/40 bg-[#FFB238]/10 text-[#FFB238]",
-  },
-  {
-    value: "interview",
-    label: "Interview",
-    tone: "border-cyan-300/30 bg-cyan-400/10 text-cyan-100",
-  },
-  {
-    value: "offer",
-    label: "Offer",
-    tone: "border-green-300/30 bg-green-400/10 text-green-100",
-  },
-  {
-    value: "rejected",
-    label: "Rejected",
-    tone: "border-red-300/30 bg-red-400/10 text-red-100",
-  },
+const STATUS_TONE: Record<JobApplicationStatus, string> = {
+  not_applied:
+    "border-[var(--color-border)] bg-[var(--color-bg-elev-2)] text-[var(--color-text-secondary)]",
+  applied:
+    "border-[var(--color-info-border)] bg-[var(--color-info-bg)] text-[var(--color-info-text)]",
+  assessment:
+    "border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 text-[var(--color-text-accent)]",
+  interview:
+    "border-[var(--color-info-border)] bg-[var(--color-info-bg)] text-[var(--color-info-text)]",
+  offer:
+    "border-[var(--color-success-border)] bg-[var(--color-success-bg)] text-[var(--color-success-text)]",
+  rejected:
+    "border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]",
+};
+
+const STATUS_KEY: Record<JobApplicationStatus, string> = {
+  not_applied: "app.insights.statusNotApplied",
+  applied: "app.insights.statusApplied",
+  assessment: "app.insights.statusAssessment",
+  interview: "app.insights.statusInterview",
+  offer: "app.insights.statusOffer",
+  rejected: "app.insights.statusRejected",
+};
+
+const STATUS_VALUES: JobApplicationStatus[] = [
+  "not_applied",
+  "applied",
+  "assessment",
+  "interview",
+  "offer",
+  "rejected",
 ];
 
 type SortKey = "created_at" | "posting_date" | "application_date" | "title";
@@ -49,7 +46,14 @@ type SortDirection = "desc" | "asc";
 type JobsResponse = { jobs?: JobPost[] };
 type JobEditorState = Record<string, JobPost>;
 
+type T = (key: string, params?: Record<string, string | number>) => string;
+
+function readJobs(data: JobsResponse | null | undefined): JobPost[] {
+  return Array.isArray(data?.jobs) ? data.jobs : [];
+}
+
 export default function DashboardPage() {
+  const { t, locale } = useLocale();
   const userId = useLocalUserId();
   const [jobs, setJobs] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(false);
@@ -72,10 +76,10 @@ export default function DashboardPage() {
       setLoading(true);
       setError("");
       const data = (await fetchUserJobs(userId)) as JobsResponse;
-      setJobs((data.jobs || []).map(normalizeJob));
-    } catch (loadError) {
-      console.error(loadError);
-      setError("Failed to load saved jobs.");
+      setJobs(readJobs(data).map(normalizeJob));
+    } catch {
+      setJobs([]);
+      setError("");
     } finally {
       setLoading(false);
     }
@@ -149,9 +153,9 @@ export default function DashboardPage() {
   ]);
 
   const statusCounts = useMemo(() => {
-    return STATUS_OPTIONS.reduce<Record<JobApplicationStatus, number>>(
-      (counts, option) => {
-        counts[option.value] = jobs.filter((job) => job.status === option.value).length;
+    return STATUS_VALUES.reduce<Record<JobApplicationStatus, number>>(
+      (counts, value) => {
+        counts[value] = jobs.filter((job) => job.status === value).length;
         return counts;
       },
       {
@@ -196,7 +200,7 @@ export default function DashboardPage() {
       );
     } catch (updateError) {
       console.error(updateError);
-      setError("Failed to update this job. Reloading saved data.");
+      setError(t("app.dashboard.errUpdate"));
       await loadJobs();
     } finally {
       setBusyJobId("");
@@ -272,7 +276,7 @@ export default function DashboardPage() {
       cancelEdit(jobId);
     } catch (saveError) {
       console.error(saveError);
-      setError("Failed to save your edits.");
+      setError(t("app.dashboard.errSaveEdits"));
     } finally {
       setBusyJobId("");
     }
@@ -281,7 +285,10 @@ export default function DashboardPage() {
   const handleDeleteJob = async (job: JobPost) => {
     if (!userId) return;
     const confirmed = window.confirm(
-      `Delete ${job.title} at ${job.company || "this company"} from your dashboard?`
+      t("app.dashboard.deleteConfirm", {
+        title: job.title,
+        company: job.company || t("app.dashboard.thisCompany"),
+      })
     );
 
     if (!confirmed) return;
@@ -298,27 +305,27 @@ export default function DashboardPage() {
       }
     } catch (deleteError) {
       console.error(deleteError);
-      setError("Failed to delete this job.");
+      setError(t("app.dashboard.errDelete"));
     } finally {
       setBusyJobId("");
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#011A55] text-white">
+    <main className="min-h-screen text-[var(--color-text-primary)]">
       <Header />
 
       <section className="mx-auto max-w-7xl px-6 py-16">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-[#FFB238]">Application Tracker</p>
-            <h1 className="mt-3 text-4xl font-bold text-[#FFB238]">
-              Jobs Dashboard
+            <p className="text-sm font-medium text-[var(--color-text-accent)]">
+              {t("app.dashboard.eyebrow")}
+            </p>
+            <h1 className="mt-3 text-4xl font-bold text-[var(--color-text-accent)]">
+              {t("app.dashboard.title")}
             </h1>
-            <p className="mt-4 max-w-2xl text-slate-300">
-              Review structured job posts, update application progress, edit any
-              parsed field, and delete records that should not stay in your
-              account.
+            <p className="mt-4 max-w-2xl text-[var(--color-text-secondary)]">
+              {t("app.dashboard.subtitle")}
             </p>
           </div>
 
@@ -327,78 +334,84 @@ export default function DashboardPage() {
               type="button"
               onClick={loadJobs}
               disabled={loading}
-              className="rounded-lg border border-[#FFB238]/40 px-5 py-3 text-sm font-semibold text-[#FFB238] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg border border-[var(--color-accent)]/40 px-5 py-3 text-sm font-semibold text-[var(--color-text-accent)] transition hover:bg-[var(--color-bg-elev-2)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Loading..." : "Refresh Jobs"}
+              {loading
+                ? t("app.dashboard.refreshing")
+                : t("app.dashboard.refresh")}
             </button>
             <Link
               href="/import-jobs"
-              className="rounded-lg bg-[#FFB238] px-5 py-3 text-sm font-semibold text-[#011A55] transition hover:opacity-90"
+              className="rounded-lg bg-[var(--color-accent)] px-5 py-3 text-sm font-semibold text-[var(--color-accent-text)] transition hover:opacity-90"
             >
-              Import Job
+              {t("app.dashboard.importJob")}
             </Link>
           </div>
         </div>
 
         <div className="mt-10 grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {STATUS_OPTIONS.map((option) => (
+          {STATUS_VALUES.map((statusValue) => (
             <button
               type="button"
-              key={option.value}
-              onClick={() => setStatusFilter(option.value)}
-              className={`rounded-lg border p-4 text-left transition hover:-translate-y-0.5 ${option.tone}`}
+              key={statusValue}
+              onClick={() => setStatusFilter(statusValue)}
+              className={`rounded-lg border p-4 text-left transition hover:-translate-y-0.5 ${STATUS_TONE[statusValue]}`}
             >
-              <p className="text-xs uppercase opacity-80">{option.label}</p>
-              <p className="mt-2 text-3xl font-bold">{statusCounts[option.value]}</p>
+              <p className="text-xs uppercase opacity-80">
+                {t(STATUS_KEY[statusValue])}
+              </p>
+              <p className="mt-2 text-3xl font-bold">
+                {statusCounts[statusValue]}
+              </p>
             </button>
           ))}
         </div>
 
-        <section className="mt-8 rounded-lg border border-white/10 bg-white/5 p-5">
+        <section className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-5">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm text-slate-300">
-              Search
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.dashboard.filterSearch")}
               <input
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
-                placeholder="Title, company, keyword..."
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+                placeholder={t("app.dashboard.filterSearchPh")}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </label>
 
-            <label className="text-sm text-slate-300">
-              Status
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.dashboard.filterStatus")}
               <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                 value={statusFilter}
                 onChange={(event) =>
                   setStatusFilter(event.target.value as JobApplicationStatus | "all")
                 }
               >
-                <option value="all">All Statuses</option>
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                <option value="all">{t("app.dashboard.filterAllStatuses")}</option>
+                {STATUS_VALUES.map((statusValue) => (
+                  <option key={statusValue} value={statusValue}>
+                    {t(STATUS_KEY[statusValue])}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label className="text-sm text-slate-300">
-              Location
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.dashboard.filterLocation")}
               <input
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
-                placeholder="City, state, remote..."
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+                placeholder={t("app.dashboard.filterLocationPh")}
                 value={locationFilter}
                 onChange={(event) => setLocationFilter(event.target.value)}
               />
             </label>
 
-            <label className="text-sm text-slate-300">
-              Salary
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.dashboard.filterSalary")}
               <input
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
-                placeholder="$100k, hourly, range..."
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
+                placeholder={t("app.dashboard.filterSalaryPh")}
                 value={salaryFilter}
                 onChange={(event) => setSalaryFilter(event.target.value)}
               />
@@ -406,14 +419,14 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <label className="text-sm text-slate-300">
-              Skill
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.dashboard.filterSkill")}
               <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                 value={skillFilter}
                 onChange={(event) => setSkillFilter(event.target.value)}
               >
-                <option value="">All Skills</option>
+                <option value="">{t("app.dashboard.filterAllSkills")}</option>
                 {allSkills.map((skill) => (
                   <option key={skill} value={skill}>
                     {skill}
@@ -422,43 +435,46 @@ export default function DashboardPage() {
               </select>
             </label>
 
-            <label className="text-sm text-slate-300">
-              Sort By
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.dashboard.filterSort")}
               <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                 value={sortKey}
                 onChange={(event) => setSortKey(event.target.value as SortKey)}
               >
-                <option value="created_at">Import Date</option>
-                <option value="posting_date">Posting Date</option>
-                <option value="application_date">Application Date</option>
-                <option value="title">Job Title</option>
+                <option value="created_at">{t("app.dashboard.sortCreated")}</option>
+                <option value="posting_date">{t("app.dashboard.sortPosting")}</option>
+                <option value="application_date">{t("app.dashboard.sortApplication")}</option>
+                <option value="title">{t("app.dashboard.sortTitle")}</option>
               </select>
             </label>
 
-            <label className="text-sm text-slate-300">
-              Direction
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.dashboard.filterDirection")}
               <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                 value={sortDirection}
                 onChange={(event) => setSortDirection(event.target.value as SortDirection)}
               >
-                <option value="desc">Newest / Z-A</option>
-                <option value="asc">Oldest / A-Z</option>
+                <option value="desc">{t("app.dashboard.directionDesc")}</option>
+                <option value="asc">{t("app.dashboard.directionAsc")}</option>
               </select>
             </label>
           </div>
         </section>
 
         {error && (
-          <div className="mt-6 rounded-lg border border-red-300/30 bg-red-500/10 p-4 text-sm text-red-100">
+          <div className="mt-6 rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] p-4 text-sm text-[var(--color-danger-text)]">
             {error}
           </div>
         )}
 
-        <div className="mt-6 flex items-center justify-between text-sm text-slate-300">
+        <div className="mt-6 flex items-center justify-between text-sm text-[var(--color-text-secondary)]">
           <p>
-            Showing {filteredJobs.length} of {jobs.length} saved jobs.
+            {t("app.dashboard.countShowing", {
+              n: filteredJobs.length,
+              total: jobs.length,
+            })}
           </p>
           <button
             type="button"
@@ -471,17 +487,19 @@ export default function DashboardPage() {
               setSortKey("created_at");
               setSortDirection("desc");
             }}
-            className="text-[#FFB238] hover:underline"
+            className="text-[var(--color-text-accent)] hover:underline"
           >
-            Clear filters
+            {t("app.dashboard.clearFilters")}
           </button>
         </div>
 
         {filteredJobs.length === 0 ? (
-          <section className="mt-8 rounded-lg border border-white/10 bg-white/5 p-10 text-center">
-            <h2 className="text-xl font-semibold text-[#FFB238]">No jobs found</h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-300">
-              Import a job post or clear your filters to see saved opportunities.
+          <section className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-10 text-center">
+            <h2 className="text-xl font-semibold text-[var(--color-text-accent)]">
+              {t("app.dashboard.emptyTitle")}
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-secondary)]">
+              {t("app.dashboard.emptyBody")}
             </p>
           </section>
         ) : (
@@ -493,45 +511,49 @@ export default function DashboardPage() {
               return (
                 <article
                   key={job.job_id}
-                  className="rounded-lg border border-white/10 bg-white/5 p-6"
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6"
                 >
                   <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-3">
-                        <StatusBadge status={viewJob.status} />
-                        <span className="text-xs text-slate-400">
-                          Imported {formatDate(viewJob.created_at)}
+                        <StatusBadge status={viewJob.status} t={t} />
+                        <span className="text-xs text-[var(--color-text-muted)]">
+                          {t("app.dashboard.importedAt", {
+                            date: formatDate(viewJob.created_at, locale, t),
+                          })}
                         </span>
                         {busyJobId === job.job_id && (
-                          <span className="text-xs text-[#FFB238]">Saving...</span>
+                          <span className="text-xs text-[var(--color-text-accent)]">
+                            {t("app.dashboard.saving")}
+                          </span>
                         )}
                       </div>
 
                       {isEditing ? (
                         <div className="mt-4 grid gap-4 md:grid-cols-2">
                           <TextField
-                            label="Job Title"
+                            label={t("app.dashboard.fJobTitle")}
                             value={viewJob.title}
                             onChange={(value) =>
                               updateDraft(job.job_id, (draft) => ({ ...draft, title: value }))
                             }
                           />
                           <TextField
-                            label="Company"
+                            label={t("app.dashboard.fCompany")}
                             value={viewJob.company}
                             onChange={(value) =>
                               updateDraft(job.job_id, (draft) => ({ ...draft, company: value }))
                             }
                           />
                           <TextField
-                            label="Location"
+                            label={t("app.dashboard.fLocation")}
                             value={viewJob.location}
                             onChange={(value) =>
                               updateDraft(job.job_id, (draft) => ({ ...draft, location: value }))
                             }
                           />
                           <TextField
-                            label="Work Mode"
+                            label={t("app.dashboard.fWorkMode")}
                             value={viewJob.work_mode}
                             onChange={(value) =>
                               updateDraft(job.job_id, (draft) => ({ ...draft, work_mode: value }))
@@ -540,10 +562,10 @@ export default function DashboardPage() {
                         </div>
                       ) : (
                         <>
-                          <h2 className="mt-4 text-2xl font-bold text-white">{viewJob.title}</h2>
-                          <p className="mt-2 text-sm text-slate-300">
-                            {viewJob.company || "Company not listed"} ·{" "}
-                            {viewJob.location || "Location unknown"} · {viewJob.work_mode}
+                          <h2 className="mt-4 text-2xl font-bold text-[var(--color-text-primary)]">{viewJob.title}</h2>
+                          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                            {viewJob.company || t("app.dashboard.companyMissing")} ·{" "}
+                            {viewJob.location || t("app.dashboard.locationMissing")} · {viewJob.work_mode}
                           </p>
                         </>
                       )}
@@ -552,7 +574,7 @@ export default function DashboardPage() {
                         {viewJob.required_skills.slice(0, 12).map((skill) => (
                           <span
                             key={skill}
-                            className="rounded-full bg-[#FFB238]/15 px-3 py-1 text-xs text-[#FFB238]"
+                            className="rounded-full bg-[var(--color-accent)]/15 px-3 py-1 text-xs text-[var(--color-text-accent)]"
                           >
                             {skill}
                           </span>
@@ -561,11 +583,11 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[440px]">
-                      <label className="text-sm text-slate-300">
-                        Status
+                      <label className="text-sm text-[var(--color-text-secondary)]">
+                        {t("app.dashboard.fStatus")}
                         {isEditing ? (
                           <select
-                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                             value={viewJob.status}
                             onChange={(event) =>
                               updateDraft(job.job_id, (draft) => ({
@@ -574,15 +596,15 @@ export default function DashboardPage() {
                               }))
                             }
                           >
-                            {STATUS_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
+                            {STATUS_VALUES.map((statusValue) => (
+                              <option key={statusValue} value={statusValue}>
+                                {t(STATUS_KEY[statusValue])}
                               </option>
                             ))}
                           </select>
                         ) : (
                           <select
-                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                             value={viewJob.status}
                             onChange={(event) =>
                               handleQuickUpdate(job, {
@@ -590,21 +612,21 @@ export default function DashboardPage() {
                               })
                             }
                           >
-                            {STATUS_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
+                            {STATUS_VALUES.map((statusValue) => (
+                              <option key={statusValue} value={statusValue}>
+                                {t(STATUS_KEY[statusValue])}
                               </option>
                             ))}
                           </select>
                         )}
                       </label>
 
-                      <label className="text-sm text-slate-300">
-                        Application Date
+                      <label className="text-sm text-[var(--color-text-secondary)]">
+                        {t("app.dashboard.fAppDate")}
                         {isEditing ? (
                           <input
                             type="date"
-                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                             value={normalizeDateInput(viewJob.application_date)}
                             onChange={(event) =>
                               updateDraft(job.job_id, (draft) => ({
@@ -616,7 +638,7 @@ export default function DashboardPage() {
                         ) : (
                           <input
                             type="date"
-                            className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                            className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                             value={normalizeDateInput(viewJob.application_date)}
                             onChange={(event) =>
                               handleQuickUpdate(job, {
@@ -636,34 +658,34 @@ export default function DashboardPage() {
                           type="button"
                           onClick={() => saveEditedJob(job.job_id)}
                           disabled={busyJobId === job.job_id}
-                          className="rounded-lg bg-[#FFB238] px-4 py-2 text-sm font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-[var(--color-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Save Changes
+                          {t("app.dashboard.saveChanges")}
                         </button>
                         <button
                           type="button"
                           onClick={() => cancelEdit(job.job_id)}
-                          className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                          className="rounded-lg border border-[var(--color-border-strong)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-bg-elev-2)]"
                         >
-                          Cancel
+                          {t("app.dashboard.cancel")}
                         </button>
                       </>
                     ) : (
                       <button
                         type="button"
                         onClick={() => beginEdit(job)}
-                        className="rounded-lg border border-[#FFB238]/40 px-4 py-2 text-sm font-semibold text-[#FFB238] transition hover:bg-white/10"
+                        className="rounded-lg border border-[var(--color-accent)]/40 px-4 py-2 text-sm font-semibold text-[var(--color-text-accent)] transition hover:bg-[var(--color-bg-elev-2)]"
                       >
-                        Edit Job
+                        {t("app.dashboard.editJob")}
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => handleDeleteJob(job)}
                       disabled={busyJobId === job.job_id}
-                      className="rounded-lg border border-red-300/30 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-lg border border-[var(--color-danger-border)] px-4 py-2 text-sm font-semibold text-[var(--color-danger-text)] transition hover:bg-[var(--color-danger-bg)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Delete Job
+                      {t("app.dashboard.deleteJob")}
                     </button>
                   </div>
 
@@ -671,7 +693,7 @@ export default function DashboardPage() {
                     {isEditing ? (
                       <>
                         <TextField
-                          label="Salary"
+                          label={t("app.dashboard.fSalary")}
                           value={viewJob.salary_range}
                           onChange={(value) =>
                             updateDraft(job.job_id, (draft) => ({
@@ -681,7 +703,7 @@ export default function DashboardPage() {
                           }
                         />
                         <TextField
-                          label="Posting Date"
+                          label={t("app.dashboard.fPostingDate")}
                           value={viewJob.posting_date}
                           onChange={(value) =>
                             updateDraft(job.job_id, (draft) => ({
@@ -691,7 +713,7 @@ export default function DashboardPage() {
                           }
                         />
                         <TextField
-                          label="Employment Type"
+                          label={t("app.dashboard.fEmploymentType")}
                           value={viewJob.employment_type}
                           onChange={(value) =>
                             updateDraft(job.job_id, (draft) => ({
@@ -701,7 +723,7 @@ export default function DashboardPage() {
                           }
                         />
                         <TextField
-                          label="Sponsorship"
+                          label={t("app.dashboard.fSponsorship")}
                           value={viewJob.visa_sponsorship}
                           onChange={(value) =>
                             updateDraft(job.job_id, (draft) => ({
@@ -713,10 +735,22 @@ export default function DashboardPage() {
                       </>
                     ) : (
                       <>
-                        <Meta label="Salary" value={viewJob.salary_range || "Unknown"} />
-                        <Meta label="Posting Date" value={viewJob.posting_date || "Unknown"} />
-                        <Meta label="Type" value={viewJob.employment_type} />
-                        <Meta label="Sponsorship" value={viewJob.visa_sponsorship} />
+                        <Meta
+                          label={t("app.dashboard.fSalary")}
+                          value={viewJob.salary_range || t("app.dashboard.unknown")}
+                        />
+                        <Meta
+                          label={t("app.dashboard.fPostingDate")}
+                          value={viewJob.posting_date || t("app.dashboard.unknown")}
+                        />
+                        <Meta
+                          label={t("app.dashboard.fType")}
+                          value={viewJob.employment_type}
+                        />
+                        <Meta
+                          label={t("app.dashboard.fSponsorship")}
+                          value={viewJob.visa_sponsorship}
+                        />
                       </>
                     )}
                   </div>
@@ -724,7 +758,7 @@ export default function DashboardPage() {
                   {isEditing ? (
                     <div className="mt-5 space-y-4">
                       <ListEditor
-                        label="Required Skills"
+                        label={t("app.dashboard.fRequiredSkills")}
                         value={viewJob.required_skills}
                         onChange={(value) =>
                           updateDraft(job.job_id, (draft) => ({
@@ -732,10 +766,10 @@ export default function DashboardPage() {
                             required_skills: value,
                           }))
                         }
-                        placeholder="Python, SQL, Tableau"
+                        placeholder={t("app.dashboard.phRequiredSkills")}
                       />
                       <ListEditor
-                        label="Preferred Skills"
+                        label={t("app.dashboard.fPreferredSkills")}
                         value={viewJob.preferred_skills}
                         onChange={(value) =>
                           updateDraft(job.job_id, (draft) => ({
@@ -743,10 +777,10 @@ export default function DashboardPage() {
                             preferred_skills: value,
                           }))
                         }
-                        placeholder="dbt, Airflow, Snowflake"
+                        placeholder={t("app.dashboard.phPreferredSkills")}
                       />
                       <TextAreaField
-                        label="Summary"
+                        label={t("app.dashboard.fSummary")}
                         value={viewJob.summary}
                         onChange={(value) =>
                           updateDraft(job.job_id, (draft) => ({
@@ -758,19 +792,23 @@ export default function DashboardPage() {
                       />
                     </div>
                   ) : (
-                    <p className="mt-5 text-sm leading-6 text-slate-300">{viewJob.summary}</p>
+                    <p className="mt-5 text-sm leading-6 text-[var(--color-text-secondary)]">
+                      {viewJob.summary}
+                    </p>
                   )}
 
                   <details className="mt-5">
-                    <summary className="cursor-pointer text-sm font-semibold text-[#FFB238]">
-                      {isEditing ? "Edit requirements, responsibilities, notes, and raw text" : "Requirements and notes"}
+                    <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-accent)]">
+                      {isEditing
+                        ? t("app.dashboard.detailsToggleEdit")
+                        : t("app.dashboard.detailsToggleView")}
                     </summary>
 
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                       {isEditing ? (
                         <>
                           <ListEditor
-                            label="Requirements"
+                            label={t("app.dashboard.fRequirements")}
                             value={viewJob.requirements}
                             onChange={(value) =>
                               updateDraft(job.job_id, (draft) => ({
@@ -778,11 +816,11 @@ export default function DashboardPage() {
                                 requirements: value,
                               }))
                             }
-                            placeholder="One requirement per line"
+                            placeholder={t("app.dashboard.phRequirements")}
                             multiline
                           />
                           <ListEditor
-                            label="Responsibilities"
+                            label={t("app.dashboard.fResponsibilities")}
                             value={viewJob.responsibilities}
                             onChange={(value) =>
                               updateDraft(job.job_id, (draft) => ({
@@ -790,23 +828,31 @@ export default function DashboardPage() {
                                 responsibilities: value,
                               }))
                             }
-                            placeholder="One responsibility per line"
+                            placeholder={t("app.dashboard.phResponsibilities")}
                             multiline
                           />
                         </>
                       ) : (
                         <>
-                          <ListBlock title="Requirements" items={viewJob.requirements} />
-                          <ListBlock title="Responsibilities" items={viewJob.responsibilities} />
+                          <ListBlock
+                            title={t("app.dashboard.fRequirements")}
+                            items={viewJob.requirements}
+                            emptyText={t("app.dashboard.noDetailsExtracted")}
+                          />
+                          <ListBlock
+                            title={t("app.dashboard.fResponsibilities")}
+                            items={viewJob.responsibilities}
+                            emptyText={t("app.dashboard.noDetailsExtracted")}
+                          />
                         </>
                       )}
                     </div>
 
-                    <label className="mt-4 block text-sm text-slate-300">
-                      Notes
+                    <label className="mt-4 block text-sm text-[var(--color-text-secondary)]">
+                      {t("app.dashboard.fNotes")}
                       {isEditing ? (
                         <textarea
-                          className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                          className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                           rows={3}
                           value={viewJob.notes}
                           onChange={(event) =>
@@ -815,11 +861,11 @@ export default function DashboardPage() {
                               notes: event.target.value,
                             }))
                           }
-                          placeholder="Add recruiter notes, links, or follow-up reminders..."
+                          placeholder={t("app.dashboard.fNotesPh")}
                         />
                       ) : (
                         <textarea
-                          className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                          className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                           rows={3}
                           value={viewJob.notes}
                           onChange={(event) =>
@@ -834,14 +880,14 @@ export default function DashboardPage() {
                           onBlur={(event) =>
                             handleQuickUpdate(job, { notes: event.target.value })
                           }
-                          placeholder="Add recruiter notes, links, or follow-up reminders..."
+                          placeholder={t("app.dashboard.fNotesPh")}
                         />
                       )}
                     </label>
 
                     {isEditing && (
                       <TextAreaField
-                        label="Raw Job Text"
+                        label={t("app.dashboard.fRawJobText")}
                         value={viewJob.raw_job_text}
                         onChange={(value) =>
                           updateDraft(job.job_id, (draft) => ({
@@ -922,46 +968,51 @@ function normalizeDateInput(value: string) {
   return new Date(timestamp).toISOString().slice(0, 10);
 }
 
-function formatDate(value?: string) {
-  if (!value) return "Unknown";
+function formatDate(value: string | undefined, locale: string, t: T) {
+  if (!value) return t("app.dashboard.unknown");
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) return value;
-  return new Intl.DateTimeFormat("en-US", {
+  const intlLocale = locale === "zh" ? "zh-CN" : "en-US";
+  return new Intl.DateTimeFormat(intlLocale, {
     month: "short",
     day: "numeric",
     year: "numeric",
   }).format(new Date(timestamp));
 }
 
-function StatusBadge({ status }: { status: JobApplicationStatus }) {
-  const option =
-    STATUS_OPTIONS.find((statusOption) => statusOption.value === status) ||
-    STATUS_OPTIONS[0];
-
+function StatusBadge({ status, t }: { status: JobApplicationStatus; t: T }) {
   return (
-    <span className={`rounded-full border px-3 py-1 text-xs ${option.tone}`}>
-      {option.label}
+    <span className={`rounded-full border px-3 py-1 text-xs ${STATUS_TONE[status]}`}>
+      {t(STATUS_KEY[status])}
     </span>
   );
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-      <p className="text-xs uppercase text-slate-400">{label}</p>
-      <p className="mt-1 text-sm text-white">{value || "Unknown"}</p>
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-3">
+      <p className="text-xs uppercase text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-1 text-sm text-[var(--color-text-primary)]">{value || "—"}</p>
     </div>
   );
 }
 
-function ListBlock({ title, items }: { title: string; items: string[] }) {
+function ListBlock({
+  title,
+  items,
+  emptyText,
+}: {
+  title: string;
+  items: string[];
+  emptyText: string;
+}) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-      <h3 className="text-sm font-semibold text-[#FFB238]">{title}</h3>
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4">
+      <h3 className="text-sm font-semibold text-[var(--color-text-accent)]">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-400">No details extracted.</p>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">{emptyText}</p>
       ) : (
-        <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+        <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--color-text-secondary)]">
           {items.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -981,10 +1032,10 @@ function TextField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="text-sm text-slate-300">
+    <label className="text-sm text-[var(--color-text-secondary)]">
       {label}
       <input
-        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -1004,10 +1055,10 @@ function TextAreaField({
   rows: number;
 }) {
   return (
-    <label className="block text-sm text-slate-300">
+    <label className="block text-sm text-[var(--color-text-secondary)]">
       <span>{label}</span>
       <textarea
-        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1038,10 +1089,10 @@ function ListEditor({
 
   if (multiline) {
     return (
-      <label className="block text-sm text-slate-300">
+      <label className="block text-sm text-[var(--color-text-secondary)]">
         {label}
         <textarea
-          className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+          className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           rows={5}
           value={serialized}
           placeholder={placeholder}
@@ -1052,10 +1103,10 @@ function ListEditor({
   }
 
   return (
-    <label className="block text-sm text-slate-300">
+    <label className="block text-sm text-[var(--color-text-secondary)]">
       {label}
       <input
-        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         value={serialized}
         placeholder={placeholder}
         onChange={(event) => handleChange(event.target.value)}

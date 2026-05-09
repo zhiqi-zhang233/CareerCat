@@ -1,12 +1,18 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+Locale = Literal["en", "zh"]
 
 
 class AgentAssistRequest(BaseModel):
     user_id: str
     message: str
-    current_page: str = "/"
+    current_page: str = "/workspace"
+    # Language the user's UI is currently in. The agent will respond in this
+    # language. Defaults to English when missing.
+    locale: Optional[Locale] = "en"
 
 
 class AgentAssistResponse(BaseModel):

@@ -1,13 +1,19 @@
 "use client";
 
-import { FormEvent, ReactNode, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { useT } from "@/lib/i18n/LocaleProvider";
 
 type AuthView = "sign_in" | "sign_up" | "confirm";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const [view, setView] = useState<AuthView>("sign_in");
+  const t = useT();
+  const searchParams = useSearchParams();
+  const initialView: AuthView =
+    searchParams?.get("auth") === "signup" ? "sign_up" : "sign_in";
+  const [view, setView] = useState<AuthView>(initialView);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -15,13 +21,21 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // If the URL changes (e.g. user clicks Sign up while the gate is mounted)
+  // sync the view to the new query param.
+  useEffect(() => {
+    const next = searchParams?.get("auth");
+    if (next === "signup") setView("sign_up");
+    else if (next === "signin") setView("sign_in");
+  }, [searchParams]);
+
   if (!auth.isCognito) return <>{children}</>;
 
   if (auth.status === "loading") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#011A55] px-6 text-white">
         <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-slate-300">
-          Loading your CareerCat account...
+          {t("auth.loadingAccount")}
         </div>
       </main>
     );
@@ -45,7 +59,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
         const result = await auth.signUp(email.trim(), password);
         if (result.needsConfirmation) {
           setView("confirm");
-          setMessage("Check your email for a confirmation code.");
+          setMessage(t("auth.msgCheckEmail"));
         } else {
           await auth.signIn(email.trim(), password);
         }
@@ -54,9 +68,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
       await auth.confirmSignUp(email.trim(), code.trim());
       setView("sign_in");
-      setMessage("Account confirmed. You can sign in now.");
+      setMessage(t("auth.msgConfirmed"));
     } catch (authError) {
-      setError(errorMessage(authError));
+      setError(errorMessage(authError, t));
     } finally {
       setSubmitting(false);
     }
@@ -64,7 +78,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   const handleResendCode = async () => {
     if (!email.trim()) {
-      setError("Enter your email first.");
+      setError(t("auth.errEmailFirst"));
       return;
     }
 
@@ -73,9 +87,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       setError("");
       setMessage("");
       await auth.resendConfirmationCode(email.trim());
-      setMessage("A new confirmation code has been sent.");
+      setMessage(t("auth.msgCodeSent"));
     } catch (authError) {
-      setError(errorMessage(authError));
+      setError(errorMessage(authError, t));
     } finally {
       setSubmitting(false);
     }
@@ -86,14 +100,13 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       <section className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_420px] lg:items-center">
         <div>
           <p className="text-sm font-semibold text-[#FFB238]">
-            CareerCat Account
+            {t("auth.eyebrow")}
           </p>
           <h1 className="mt-4 text-5xl font-bold leading-tight text-[#FFB238]">
-            Sign in to keep your job search workspace private.
+            {t("auth.title")}
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-            Your resume profile, saved jobs, application status, coach sessions,
-            and preparation history are stored under your own account.
+            {t("auth.subtitle")}
           </p>
         </div>
 
@@ -102,20 +115,19 @@ export default function AuthGate({ children }: { children: ReactNode }) {
           className="rounded-lg border border-white/10 bg-white/5 p-6"
         >
           <h2 className="text-2xl font-semibold text-[#FFB238]">
-            {view === "sign_in" && "Sign In"}
-            {view === "sign_up" && "Create Account"}
-            {view === "confirm" && "Confirm Email"}
+            {view === "sign_in" && t("auth.signIn")}
+            {view === "sign_up" && t("auth.createAccount")}
+            {view === "confirm" && t("auth.confirmEmail")}
           </h2>
 
           {!auth.isConfigured && (
             <div className="mt-4 rounded-lg border border-red-300/30 bg-red-500/10 p-4 text-sm text-red-100">
-              Cognito is not configured. Add the Cognito environment variables
-              before using production authentication.
+              {t("auth.cognitoNotConfigured")}
             </div>
           )}
 
           <label className="mt-5 block text-sm font-semibold text-slate-300">
-            Email
+            {t("auth.email")}
             <input
               type="email"
               value={email}
@@ -127,7 +139,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
           {view !== "confirm" && (
             <label className="mt-4 block text-sm font-semibold text-slate-300">
-              Password
+              {t("auth.password")}
               <input
                 type="password"
                 value={password}
@@ -140,7 +152,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
           {view === "confirm" && (
             <label className="mt-4 block text-sm font-semibold text-slate-300">
-              Confirmation Code
+              {t("auth.confirmationCode")}
               <input
                 type="text"
                 value={code}
@@ -168,7 +180,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
             disabled={submitting || !auth.isConfigured}
             className="mt-6 w-full rounded-lg bg-[#FFB238] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? "Working..." : submitLabel(view)}
+            {submitting ? t("auth.working") : submitLabel(view, t)}
           </button>
 
           <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-300">
@@ -178,7 +190,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
                 onClick={() => setView("sign_in")}
                 className="text-[#FFB238] hover:underline"
               >
-                I already have an account
+                {t("auth.haveAccount")}
               </button>
             )}
             {view !== "sign_up" && (
@@ -187,7 +199,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
                 onClick={() => setView("sign_up")}
                 className="text-[#FFB238] hover:underline"
               >
-                Create a new account
+                {t("auth.createNewAccount")}
               </button>
             )}
             {view !== "confirm" && (
@@ -196,7 +208,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
                 onClick={() => setView("confirm")}
                 className="text-[#FFB238] hover:underline"
               >
-                I have a confirmation code
+                {t("auth.haveCode")}
               </button>
             )}
             {view === "confirm" && (
@@ -206,7 +218,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
                 disabled={submitting}
                 className="text-[#FFB238] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Resend code
+                {t("auth.resendCode")}
               </button>
             )}
           </div>
@@ -216,16 +228,16 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   );
 }
 
-function submitLabel(view: AuthView) {
-  if (view === "sign_up") return "Create Account";
-  if (view === "confirm") return "Confirm Email";
-  return "Sign In";
+function submitLabel(view: AuthView, t: (key: string) => string) {
+  if (view === "sign_up") return t("auth.createAccount");
+  if (view === "confirm") return t("auth.confirmEmail");
+  return t("auth.signIn");
 }
 
-function errorMessage(error: unknown) {
+function errorMessage(error: unknown, t: (key: string) => string) {
   if (error && typeof error === "object" && "message" in error) {
     return String((error as { message?: string }).message);
   }
 
-  return "Authentication failed. Please try again.";
+  return t("auth.errAuthFailed");
 }

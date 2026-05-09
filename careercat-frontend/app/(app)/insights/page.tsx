@@ -5,8 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchUserJobs } from "@/lib/api";
 import type { JobApplicationStatus, JobPost } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
+import { useT } from "@/lib/i18n/LocaleProvider";
 
 type JobsResponse = { jobs?: JobPost[] };
+
+function readJobs(data: JobsResponse | null | undefined): JobPost[] {
+  return Array.isArray(data?.jobs) ? data.jobs : [];
+}
 
 const STATUS_ORDER: JobApplicationStatus[] = [
   "not_applied",
@@ -17,13 +22,13 @@ const STATUS_ORDER: JobApplicationStatus[] = [
   "rejected",
 ];
 
-const STATUS_LABEL: Record<JobApplicationStatus, string> = {
-  not_applied: "Not Applied",
-  applied: "Applied",
-  assessment: "Assessment",
-  interview: "Interview",
-  offer: "Offer",
-  rejected: "Rejected",
+const STATUS_KEYS: Record<JobApplicationStatus, string> = {
+  not_applied: "app.insights.statusNotApplied",
+  applied: "app.insights.statusApplied",
+  assessment: "app.insights.statusAssessment",
+  interview: "app.insights.statusInterview",
+  offer: "app.insights.statusOffer",
+  rejected: "app.insights.statusRejected",
 };
 
 const STATUS_COLOR: Record<JobApplicationStatus, string> = {
@@ -42,6 +47,7 @@ const ACTIVE_STATUSES: JobApplicationStatus[] = [
 ];
 
 export default function InsightsPage() {
+  const t = useT();
   const userId = useLocalUserId();
   const [jobs, setJobs] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,10 +61,12 @@ export default function InsightsPage() {
         setLoading(true);
         setError("");
         const data = (await fetchUserJobs(userId)) as JobsResponse;
-        if (!cancelled) setJobs(data.jobs || []);
-      } catch (loadError) {
-        console.error(loadError);
-        if (!cancelled) setError("Failed to load your saved jobs.");
+        if (!cancelled) setJobs(readJobs(data));
+      } catch {
+        if (!cancelled) {
+          setJobs([]);
+          setError("");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -66,32 +74,31 @@ export default function InsightsPage() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, t]);
 
-  const stats = useMemo(() => computeStats(jobs), [jobs]);
+  const stats = useMemo(() => computeStats(jobs, t), [jobs, t]);
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 lg:px-8 lg:py-10">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-accent)]">
-            Insights
+            {t("app.insights.eyebrow")}
           </p>
           <h1 className="mt-2 text-2xl font-bold leading-tight md:text-3xl">
-            See where your search is leaking.
+            {t("app.insights.title")}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-text-secondary)]">
-            All numbers come from your saved jobs. Update statuses on the
-            Dashboard to keep this page accurate.
+            {t("app.insights.subtitle")}
           </p>
         </div>
         <Link href="/dashboard" className="cc-btn cc-btn-secondary">
-          Open dashboard →
+          {t("app.insights.openDashboard")}
         </Link>
       </header>
 
       {error && (
-        <div className="mt-6 rounded-[var(--radius-md)] border border-red-300/30 bg-red-500/10 p-4 text-sm text-red-100">
+        <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] p-4 text-sm text-[var(--color-danger-text)]">
           {error}
         </div>
       )}
@@ -104,32 +111,37 @@ export default function InsightsPage() {
         <>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
-              label="Saved jobs"
+              label={t("app.insights.kpiSavedJobs")}
               value={stats.totalJobs.toString()}
-              hint={`${stats.activeApplications} actively applied`}
+              hint={t("app.insights.kpiSavedJobsHint", {
+                n: stats.activeApplications,
+              })}
             />
             <KpiCard
-              label="This week"
+              label={t("app.insights.kpiThisWeek")}
               value={stats.thisWeekApplied.toString()}
-              hint="applications submitted"
+              hint={t("app.insights.kpiThisWeekHint")}
             />
             <KpiCard
-              label="Response rate"
+              label={t("app.insights.kpiResponse")}
               value={
                 stats.responseRate === null
                   ? "—"
                   : `${Math.round(stats.responseRate * 100)}%`
               }
-              hint={`${stats.responsesCount} of ${stats.appliedCount} replied`}
+              hint={t("app.insights.kpiResponseHint", {
+                r: stats.responsesCount,
+                a: stats.appliedCount,
+              })}
             />
             <KpiCard
-              label="Avg response time"
+              label={t("app.insights.kpiAvgResponse")}
               value={
                 stats.avgResponseDays === null
                   ? "—"
                   : `${stats.avgResponseDays.toFixed(1)}d`
               }
-              hint="from applied → first reply"
+              hint={t("app.insights.kpiAvgResponseHint")}
             />
           </div>
 
@@ -148,7 +160,7 @@ export default function InsightsPage() {
 
           <div className="mt-6 cc-card p-5">
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
-              Suggestions
+              {t("app.insights.suggestionsTitle")}
             </p>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--color-text-secondary)]">
               {stats.suggestions.map((s, idx) => (
@@ -194,12 +206,15 @@ function FunnelCard({
   counts: Record<JobApplicationStatus, number>;
   total: number;
 }) {
+  const t = useT();
   const denominator = Math.max(total, 1);
   return (
     <div className="cc-card p-5">
-      <h2 className="text-base font-semibold">Application funnel</h2>
+      <h2 className="text-base font-semibold">
+        {t("app.insights.funnelTitle")}
+      </h2>
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-        Where every saved job currently lives.
+        {t("app.insights.funnelBody")}
       </p>
       <div className="mt-5 space-y-3">
         {STATUS_ORDER.map((status) => {
@@ -208,7 +223,7 @@ function FunnelCard({
           return (
             <div key={status}>
               <div className="flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
-                <span>{STATUS_LABEL[status]}</span>
+                <span>{t(STATUS_KEYS[status])}</span>
                 <span>
                   <span className="font-semibold text-[var(--color-text-primary)]">
                     {count}
@@ -238,15 +253,18 @@ function SkillsCard({
 }: {
   skills: { name: string; count: number; weight: number }[];
 }) {
+  const t = useT();
   return (
     <div className="cc-card p-5">
-      <h2 className="text-base font-semibold">Skills you keep meeting</h2>
+      <h2 className="text-base font-semibold">
+        {t("app.insights.skillsTitle")}
+      </h2>
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-        Aggregated from required + preferred skills on saved jobs.
+        {t("app.insights.skillsBody")}
       </p>
       {skills.length === 0 ? (
         <p className="mt-5 text-sm text-[var(--color-text-secondary)]">
-          No skill data yet. Save a few jobs and try again.
+          {t("app.insights.skillsEmpty")}
         </p>
       ) : (
         <div className="mt-5 flex flex-wrap gap-2">
@@ -283,13 +301,16 @@ function CompaniesCard({
 }: {
   companies: { name: string; count: number }[];
 }) {
+  const t = useT();
   return (
     <div className="cc-card p-5">
-      <h2 className="text-base font-semibold">Top companies you&apos;re tracking</h2>
+      <h2 className="text-base font-semibold">
+        {t("app.insights.companiesTitle")}
+      </h2>
       <div className="mt-4 space-y-2 text-sm">
         {companies.length === 0 ? (
           <p className="text-[var(--color-text-secondary)]">
-            No saved jobs yet.
+            {t("app.insights.companiesEmpty")}
           </p>
         ) : (
           companies.map((c) => (
@@ -299,7 +320,10 @@ function CompaniesCard({
             >
               <span className="truncate">{c.name}</span>
               <span className="text-xs text-[var(--color-text-muted)]">
-                {c.count} {c.count === 1 ? "role" : "roles"}
+                {c.count}{" "}
+                {c.count === 1
+                  ? t("app.insights.companiesRoleSingular")
+                  : t("app.insights.companiesRolePlural")}
               </span>
             </div>
           ))
@@ -316,12 +340,15 @@ function PaceCard({
   weekly: { weekLabel: string; count: number }[];
   maxWeekly: number;
 }) {
+  const t = useT();
   const denom = Math.max(maxWeekly, 1);
   return (
     <div className="cc-card p-5">
-      <h2 className="text-base font-semibold">Application pace</h2>
+      <h2 className="text-base font-semibold">
+        {t("app.insights.paceTitle")}
+      </h2>
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-        Last 8 weeks (by application date).
+        {t("app.insights.paceBody")}
       </p>
       <div className="mt-5 flex h-32 items-end gap-2">
         {weekly.map((bar) => {
@@ -351,19 +378,19 @@ function PaceCard({
 }
 
 function EmptyState() {
+  const t = useT();
   return (
     <div className="cc-card mt-10 p-10 text-center">
-      <h2 className="text-lg font-semibold">No saved jobs yet</h2>
+      <h2 className="text-lg font-semibold">{t("app.insights.emptyTitle")}</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-[var(--color-text-secondary)]">
-        Insights builds itself from the jobs you save and the statuses you
-        track. Import a JD or pull recommendations to get started.
+        {t("app.insights.emptyBody")}
       </p>
       <div className="mt-5 flex flex-wrap justify-center gap-3">
         <Link href="/import-jobs" className="cc-btn cc-btn-primary">
-          Import a JD
+          {t("app.insights.emptyImport")}
         </Link>
         <Link href="/recommendations" className="cc-btn cc-btn-secondary">
-          Find recommendations
+          {t("app.insights.emptyRecommend")}
         </Link>
       </div>
     </div>
@@ -402,7 +429,10 @@ type Stats = {
   suggestions: string[];
 };
 
-function computeStats(jobs: JobPost[]): Stats {
+function computeStats(
+  jobs: JobPost[],
+  t: (key: string, params?: Record<string, string | number>) => string
+): Stats {
   const statusCounts = STATUS_ORDER.reduce(
     (acc, s) => ({ ...acc, [s]: 0 }),
     {} as Record<JobApplicationStatus, number>
@@ -427,7 +457,7 @@ function computeStats(jobs: JobPost[]): Stats {
     statusCounts.rejected;
   const responseRate = appliedCount > 0 ? responsesCount / appliedCount : null;
 
-  // This week + 8-week pace by application_date
+  // 8-week pace by application_date
   const now = new Date();
   const weekStart = startOfWeek(now);
   let thisWeekApplied = 0;
@@ -435,8 +465,12 @@ function computeStats(jobs: JobPost[]): Stats {
     [];
   for (let i = 7; i >= 0; i--) {
     const w = addDays(weekStart, -i * 7);
+    const label =
+      i === 0
+        ? t("app.insights.paceWeekNow")
+        : t("app.insights.paceWeekAgo", { n: i });
     weekBuckets.push({
-      weekLabel: i === 0 ? "Now" : `-${i}w`,
+      weekLabel: label,
       count: 0,
       weekStart: w,
     });
@@ -459,8 +493,6 @@ function computeStats(jobs: JobPost[]): Stats {
     0
   );
 
-  // Average response time = updated_at - application_date for jobs that
-  // moved beyond "applied".
   const responseTimes: number[] = [];
   jobs.forEach((j) => {
     const applied = parseDate(j.application_date);
@@ -473,7 +505,8 @@ function computeStats(jobs: JobPost[]): Stats {
         j.status === "offer" ||
         j.status === "rejected")
     ) {
-      const days = (updated.getTime() - applied.getTime()) / (1000 * 60 * 60 * 24);
+      const days =
+        (updated.getTime() - applied.getTime()) / (1000 * 60 * 60 * 24);
       if (days >= 0 && days < 365) responseTimes.push(days);
     }
   });
@@ -482,7 +515,6 @@ function computeStats(jobs: JobPost[]): Stats {
       ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
       : null;
 
-  // Skill aggregation
   const skillMap = new Map<string, number>();
   jobs.forEach((j) => {
     [...(j.required_skills || []), ...(j.preferred_skills || [])]
@@ -502,7 +534,6 @@ function computeStats(jobs: JobPost[]): Stats {
     }))
     .sort((a, b) => b.count - a.count);
 
-  // Top companies
   const companyMap = new Map<string, number>();
   jobs.forEach((j) => {
     if (!j.company) return;
@@ -513,7 +544,6 @@ function computeStats(jobs: JobPost[]): Stats {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
 
-  // Suggestions
   const activeApplications = ACTIVE_STATUSES.reduce(
     (sum, s) => sum + statusCounts[s],
     0
@@ -521,28 +551,34 @@ function computeStats(jobs: JobPost[]): Stats {
   const suggestions: string[] = [];
   if (statusCounts.not_applied > 5) {
     suggestions.push(
-      `You have ${statusCounts.not_applied} jobs marked Not Applied — pick the top 3 today and move them to Applied.`
+      t("app.insights.sugNotApplied", { n: statusCounts.not_applied })
     );
   }
   if (responseRate !== null && responseRate < 0.1 && appliedCount >= 5) {
     suggestions.push(
-      `Response rate is ${(responseRate * 100).toFixed(0)}% — try the Coach's resume-job gap mode on jobs that ghosted to find what's off.`
+      t("app.insights.sugLowResponse", {
+        pct: Math.round(responseRate * 100),
+      })
     );
   }
   if (statusCounts.assessment >= 1) {
     suggestions.push(
-      `${statusCounts.assessment} assessment${statusCounts.assessment === 1 ? "" : "s"} in progress — open the Coach in Written Practice mode and target the role's stack.`
+      t("app.insights.sugAssessment", {
+        n: statusCounts.assessment,
+        plural: statusCounts.assessment === 1 ? "" : "s",
+      })
     );
   }
   if (statusCounts.interview >= 1) {
     suggestions.push(
-      `${statusCounts.interview} interview${statusCounts.interview === 1 ? "" : "s"} lined up — run a mock interview with the Coach to lock the loop.`
+      t("app.insights.sugInterview", {
+        n: statusCounts.interview,
+        plural: statusCounts.interview === 1 ? "" : "s",
+      })
     );
   }
   if (suggestions.length === 0) {
-    suggestions.push(
-      "Looking healthy. Keep an eye on jobs sitting in Applied for 14+ days — that's usually time to follow up."
-    );
+    suggestions.push(t("app.insights.sugHealthy"));
   }
 
   return {
@@ -588,7 +624,6 @@ function addDays(d: Date, days: number): Date {
 }
 
 function capitalizeSkill(s: string): string {
-  // Keep common acronyms uppercase; otherwise title-case the first letter.
   const ACRONYMS = new Set([
     "sql",
     "nosql",

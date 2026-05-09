@@ -189,12 +189,14 @@ export type CoachChatRequest = {
   job_id?: string;
   focus_topic?: string;
   messages: CoachMessage[];
+  locale?: "en" | "zh";
 };
 
 export type AgentAssistRequest = {
   user_id: string;
   message: string;
   current_page: string;
+  locale?: "en" | "zh";
 };
 
 export type AgentAssistResponse = {

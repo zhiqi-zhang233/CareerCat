@@ -3,76 +3,82 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocalUserId } from "@/lib/useLocalUserId";
+import { useT } from "@/lib/i18n/LocaleProvider";
+import LocaleSwitcher from "@/components/LocaleSwitcher";
 
 type NavItem = {
   href: string;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   icon: ReactNode;
 };
 
 const NAV: NavItem[] = [
   {
     href: "/workspace",
-    label: "Workspace",
-    description: "Plan a workflow",
+    labelKey: "app.nav.workspaceLabel",
+    descriptionKey: "app.nav.workspaceDesc",
     icon: <IconSparkles />,
   },
   {
     href: "/profile",
-    label: "Profile",
-    description: "Resume & preferences",
+    labelKey: "app.nav.profileLabel",
+    descriptionKey: "app.nav.profileDesc",
     icon: <IconUser />,
   },
   {
     href: "/import-jobs",
-    label: "Import Jobs",
-    description: "Parse a JD",
+    labelKey: "app.nav.importJobsLabel",
+    descriptionKey: "app.nav.importJobsDesc",
     icon: <IconClipboard />,
   },
   {
     href: "/recommendations",
-    label: "Recommendations",
-    description: "Discover roles",
+    labelKey: "app.nav.recommendationsLabel",
+    descriptionKey: "app.nav.recommendationsDesc",
     icon: <IconTarget />,
   },
   {
     href: "/dashboard",
-    label: "Dashboard",
-    description: "Saved jobs board",
+    labelKey: "app.nav.dashboardLabel",
+    descriptionKey: "app.nav.dashboardDesc",
     icon: <IconBoard />,
   },
   {
     href: "/insights",
-    label: "Insights",
-    description: "Search analytics",
+    labelKey: "app.nav.insightsLabel",
+    descriptionKey: "app.nav.insightsDesc",
     icon: <IconChart />,
   },
   {
     href: "/coach",
-    label: "Coach",
-    description: "Practice & gap analysis",
+    labelKey: "app.nav.coachLabel",
+    descriptionKey: "app.nav.coachDesc",
     icon: <IconChat />,
   },
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {
+  const t = useT();
   const pathname = usePathname();
   const auth = useAuth();
   const userId = useLocalUserId();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopNavOpen, setDesktopNavOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const navButtonRef = useRef<HTMLButtonElement>(null);
+  const desktopNavRef = useRef<HTMLElement>(null);
+  const navCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navOpenedAtRef = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Reset transient nav UI when the route changes. The set-state-in-effect
-  // rule flags this even though pathname is genuinely external state, so we
-  // opt out for this one effect.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setMobileOpen(false);
+    setDesktopNavOpen(false);
     setMenuOpen(false);
   }, [pathname]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -88,27 +94,94 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("mousedown", handler);
   }, [menuOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (navCloseTimerRef.current) clearTimeout(navCloseTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!desktopNavOpen) return;
+    const handler = (event: MouseEvent) => {
+      if (Date.now() - navOpenedAtRef.current < 200) return;
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (
+        navButtonRef.current?.contains(target) ||
+        desktopNavRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setDesktopNavOpen(false);
+    };
+    window.addEventListener("mousemove", handler);
+    return () => window.removeEventListener("mousemove", handler);
+  }, [desktopNavOpen]);
+
+  const navItems = useMemo(
+    () =>
+      NAV.map((item) => ({
+        ...item,
+        label: t(item.labelKey),
+        description: t(item.descriptionKey),
+      })),
+    [t]
+  );
+
   const activeItem =
-    NAV.find((item) => pathname === item.href) ||
-    NAV.find((item) => pathname?.startsWith(item.href + "/"));
+    navItems.find((item) => pathname === item.href) ||
+    navItems.find((item) => pathname?.startsWith(item.href + "/"));
+
   const accountId = auth.isCognito ? auth.email || "" : userId || "";
   const accountInitial = accountId
     ? accountId.trim().charAt(0).toUpperCase() || "U"
     : "U";
 
   const handleNewLocalAccount = () => {
-    const confirmed = window.confirm(
-      "Start a new local testing account on this browser? Unsaved changes will be lost."
-    );
+    const confirmed = window.confirm(t("app.topbar.newAccountConfirm"));
     if (!confirmed) return;
     auth.createNewLocalAccount();
   };
 
+  const openDesktopNav = () => {
+    if (navCloseTimerRef.current) clearTimeout(navCloseTimerRef.current);
+    navOpenedAtRef.current = Date.now();
+    setDesktopNavOpen(true);
+  };
+
+  const scheduleDesktopNavClose = () => {
+    if (navCloseTimerRef.current) clearTimeout(navCloseTimerRef.current);
+    navCloseTimerRef.current = setTimeout(() => {
+      setDesktopNavOpen(false);
+    }, 500);
+  };
+
+  const handleNavButtonClick = () => {
+    if (navCloseTimerRef.current) clearTimeout(navCloseTimerRef.current);
+    navOpenedAtRef.current = Date.now();
+    setDesktopNavOpen(true);
+  };
+
   return (
-    <div className="flex min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]">
-      {/* Sidebar — desktop */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-[var(--color-border)] lg:bg-[var(--color-bg-elev-1)]">
-        <div className="flex h-16 items-center gap-3 border-b border-[var(--color-border)] px-5">
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]">
+      {/* Hover navigation — desktop */}
+      <aside
+        ref={desktopNavRef}
+        onMouseEnter={openDesktopNav}
+        onMouseLeave={scheduleDesktopNavClose}
+        aria-hidden={!desktopNavOpen}
+        data-nav-panel="app"
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-elev-1)] shadow-[var(--shadow-lg)] transition-transform duration-200 ease-out ${
+          desktopNavOpen
+            ? "pointer-events-auto translate-x-0"
+            : "pointer-events-none -translate-x-full"
+        }`}
+      >
+        <Link
+          href="/"
+          aria-label="CareerCat home"
+          className="flex h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 transition hover:bg-[var(--color-bg-elev-2)]"
+        >
           <Image
             src="/logo.svg"
             alt="CareerCat"
@@ -121,18 +194,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
               CareerCat
             </p>
             <p className="text-[11px] text-[var(--color-text-muted)]">
-              Job search copilot
+              {t("app.nav.brandTagline")}
             </p>
           </div>
-        </div>
+        </Link>
         <nav className="flex-1 space-y-1 p-4">
-          {NAV.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.href}
               item={item}
-              active={Boolean(
-                activeItem && activeItem.href === item.href
-              )}
+              active={Boolean(activeItem && activeItem.href === item.href)}
             />
           ))}
         </nav>
@@ -142,10 +213,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
             className="block rounded-[var(--radius-md)] border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 p-3 text-sm transition hover:bg-[var(--color-accent)]/20"
           >
             <p className="font-semibold text-[var(--color-text-accent)]">
-              Upgrade to Pro
+              {t("app.nav.upgradeTitle")}
             </p>
             <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              Unlimited AI parses, multi-resume, deep insights.
+              {t("app.nav.upgradeBody")}
             </p>
           </Link>
         </div>
@@ -154,7 +225,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 lg:hidden"
+          className="fixed inset-0 z-40 md:hidden"
           onClick={() => setMobileOpen(false)}
         >
           <div className="absolute inset-0 bg-black/60" />
@@ -163,7 +234,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex h-16 items-center justify-between border-b border-[var(--color-border)] px-5">
-              <div className="flex items-center gap-2">
+              <Link
+                href="/"
+                aria-label="CareerCat home"
+                className="flex items-center gap-2 transition hover:opacity-80"
+              >
                 <Image
                   src="/logo.svg"
                   alt="CareerCat"
@@ -174,18 +249,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 <p className="text-sm font-semibold text-[var(--color-text-accent)]">
                   CareerCat
                 </p>
-              </div>
+              </Link>
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
                 className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elev-1)]"
-                aria-label="Close menu"
+                aria-label={t("app.topbar.closeMenu")}
               >
                 <IconClose />
               </button>
             </div>
             <nav className="flex-1 space-y-1 p-4">
-              {NAV.map((item) => (
+              {navItems.map((item) => (
                 <NavLink
                   key={item.href}
                   item={item}
@@ -204,13 +279,30 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]/80 px-4 backdrop-blur lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
+              ref={navButtonRef}
               type="button"
-              onClick={() => setMobileOpen(true)}
-              className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elev-1)] lg:hidden"
-              aria-label="Open menu"
+              onClick={handleNavButtonClick}
+              onMouseEnter={openDesktopNav}
+              onMouseLeave={scheduleDesktopNavClose}
+              onFocus={openDesktopNav}
+              className="rounded-[var(--radius-sm)] p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elev-1)]"
+              aria-label={t("app.topbar.openMenu")}
             >
               <IconMenu />
             </button>
+            <Link
+              href="/"
+              aria-label="CareerCat home"
+              className="flex shrink-0 items-center rounded-[var(--radius-sm)] p-1 transition hover:bg-[var(--color-bg-elev-1)]"
+            >
+              <Image
+                src="/logo.svg"
+                alt="CareerCat"
+                width={28}
+                height={28}
+                className="h-7 w-7 object-contain"
+              />
+            </Link>
             <div className="min-w-0">
               <p className="truncate text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
                 {activeItem?.description || ""}
@@ -222,11 +314,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <LocaleSwitcher size="compact" />
+
             <Link
               href="/workspace"
               className="hidden rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition hover:border-[var(--color-accent)]/40 hover:text-[var(--color-text-accent)] sm:inline-flex"
             >
-              + New plan
+              {t("app.topbar.newPlan")}
             </Link>
 
             <div className="relative" ref={menuRef}>
@@ -239,7 +333,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   {accountInitial}
                 </span>
                 <span className="hidden max-w-[160px] truncate text-xs text-[var(--color-text-secondary)] sm:inline">
-                  {accountId || "loading"}
+                  {accountId || t("app.topbar.loading")}
                 </span>
               </button>
 
@@ -247,25 +341,34 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 <div className="absolute right-0 mt-2 w-64 overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] shadow-[var(--shadow-lg)]">
                   <div className="border-b border-[var(--color-border)] p-3">
                     <p className="text-xs uppercase tracking-wide text-[var(--color-text-muted)]">
-                      {auth.isCognito ? "Signed in" : "Local account"}
+                      {auth.isCognito
+                        ? t("app.topbar.signedIn")
+                        : t("app.topbar.localAccount")}
                     </p>
                     <p className="mt-1 break-all text-sm font-medium">
-                      {accountId || "loading"}
+                      {accountId || t("app.topbar.loading")}
                     </p>
                   </div>
+                  <Link
+                    href="/settings"
+                    className="block px-3 py-2 text-sm text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-elev-1)] hover:text-[var(--color-text-primary)]"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {t("marketing.nav.settings")}
+                  </Link>
                   <Link
                     href="/profile"
                     className="block px-3 py-2 text-sm text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-elev-1)] hover:text-[var(--color-text-primary)]"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Profile & resume
+                    {t("app.topbar.profileMenu")}
                   </Link>
                   <Link
                     href="/pricing"
                     className="block px-3 py-2 text-sm text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-elev-1)] hover:text-[var(--color-text-primary)]"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Plans & billing
+                    {t("app.topbar.pricingMenu")}
                   </Link>
                   {auth.isCognito ? (
                     <button
@@ -276,7 +379,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                       }}
                       className="block w-full border-t border-[var(--color-border)] px-3 py-2 text-left text-sm text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-elev-1)] hover:text-[var(--color-danger)]"
                     >
-                      Sign out
+                      {t("app.topbar.signOut")}
                     </button>
                   ) : (
                     <button
@@ -287,7 +390,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                       }}
                       className="block w-full border-t border-[var(--color-border)] px-3 py-2 text-left text-sm text-[var(--color-text-secondary)] transition hover:bg-[var(--color-bg-elev-1)] hover:text-[var(--color-text-primary)]"
                     >
-                      Start new local account
+                      {t("app.topbar.newLocalAccount")}
                     </button>
                   )}
                 </div>
@@ -302,9 +405,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({
+  item,
+  active,
+}: {
+  item: { href: string; label: string; description: string; icon: ReactNode };
+  active: boolean;
+}) {
   return (
-    <Link
+    <a
       href={item.href}
       className={`group flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-sm transition ${
         active
@@ -327,11 +436,11 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
           {item.description}
         </span>
       </span>
-    </Link>
+    </a>
   );
 }
 
-/* --------- Inline icon set (lightweight, no extra deps) --------- */
+/* --------- Inline icon set --------- */
 
 function IconBase({ children }: { children: ReactNode }) {
   return (

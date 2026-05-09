@@ -1,6 +1,9 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+Locale = Literal["en", "zh"]
 
 
 class CoachMessage(BaseModel):
@@ -15,6 +18,7 @@ class CoachChatRequest(BaseModel):
     job_id: Optional[str] = None
     focus_topic: Optional[str] = None
     messages: List[CoachMessage] = Field(default_factory=list)
+    locale: Optional[Locale] = "en"
 
 
 class CoachChatResponse(BaseModel):

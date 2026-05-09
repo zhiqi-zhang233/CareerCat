@@ -6,12 +6,14 @@ import Header from "@/components/Header";
 import { discoverAdzunaJobs, saveJobRecommendation } from "@/lib/api";
 import type { AgentAssistResponse, JobRecommendation } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
+import { useLocale } from "@/lib/i18n/LocaleProvider";
 
 type DiscoveryResponse = {
   recommendations: JobRecommendation[];
 };
 
 export default function RecommendationsPage() {
+  const { t, locale } = useLocale();
   const userId = useLocalUserId();
   const [keywords, setKeywords] = useState("Data Analyst");
   const [location, setLocation] = useState("Chicago");
@@ -19,7 +21,9 @@ export default function RecommendationsPage() {
   const [resultsPerPage, setResultsPerPage] = useState(20);
   const [salaryMin, setSalaryMin] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
-  const [recommendations, setRecommendations] = useState<JobRecommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<JobRecommendation[]>(
+    []
+  );
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState("");
@@ -50,12 +54,12 @@ export default function RecommendationsPage() {
 
   const handleFindJobs = async () => {
     if (!userId) {
-      setError("Local account is still loading. Please try again.");
+      setError(t("app.recommendations.errAccountLoading"));
       return;
     }
 
     if (!keywords.trim()) {
-      setError("Add at least one job keyword.");
+      setError(t("app.recommendations.errEmptyKeywords"));
       return;
     }
 
@@ -78,7 +82,7 @@ export default function RecommendationsPage() {
       setRecommendations(data.recommendations || []);
     } catch (discoveryError) {
       console.error(discoveryError);
-      setError("Failed to fetch jobs from Adzuna.");
+      setError(t("app.recommendations.errDiscovery"));
       setRecommendations([]);
     } finally {
       setLoading(false);
@@ -99,111 +103,121 @@ export default function RecommendationsPage() {
       });
     } catch (saveError) {
       console.error(saveError);
-      setError("Failed to save this recommendation.");
+      setError(t("app.recommendations.errSave"));
     } finally {
       setSavingId("");
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#011A55] text-white">
+    <main className="min-h-screen text-[var(--color-text-primary)]">
       <Header />
 
       <section className="mx-auto max-w-7xl px-6 py-16">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-[#FFB238]">
-              Adzuna Job Discovery
+            <p className="text-sm font-medium text-[var(--color-text-accent)]">
+              {t("app.recommendations.eyebrow")}
             </p>
-            <h1 className="mt-3 text-4xl font-bold text-[#FFB238]">
-              Find Fresh Job Matches
+            <h1 className="mt-3 text-4xl font-bold text-[var(--color-text-accent)]">
+              {t("app.recommendations.title")}
             </h1>
-            <p className="mt-4 max-w-2xl text-slate-300">
-              Search Adzuna by keyword, location, salary, and posting window.
-              CareerCat ranks the results against your saved profile and lets
-              you send the best ones to Dashboard.
+            <p className="mt-4 max-w-2xl text-[var(--color-text-secondary)]">
+              {t("app.recommendations.subtitle")}
             </p>
           </div>
 
           <Link
             href="/dashboard"
-            className="rounded-lg border border-[#FFB238]/40 px-5 py-3 text-sm font-semibold text-[#FFB238] transition hover:bg-white/10"
+            className="rounded-lg border border-[var(--color-accent)]/40 px-5 py-3 text-sm font-semibold text-[var(--color-text-accent)] transition hover:bg-[var(--color-bg-elev-2)]"
           >
-            Open Dashboard
+            {t("app.recommendations.openDashboard")}
           </Link>
         </div>
 
-        <section className="mt-10 rounded-lg border border-white/10 bg-white/5 p-6">
+        <section className="mt-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="text-sm text-slate-300">
-              Keywords
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.recommendations.keywords")}
               <input
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                 value={keywords}
                 onChange={(event) => setKeywords(event.target.value)}
-                placeholder="Data Analyst, ML Engineer..."
+                placeholder={t("app.recommendations.keywordsPh")}
               />
             </label>
 
-            <label className="text-sm text-slate-300">
-              Location
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.recommendations.location")}
               <input
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
-                placeholder="Chicago, New York, Remote..."
+                placeholder={t("app.recommendations.locationPh")}
               />
             </label>
 
-            <label className="text-sm text-slate-300">
-              Posted Within
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.recommendations.postedWithin")}
               <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                 value={postedWithinDays}
-                onChange={(event) => setPostedWithinDays(Number(event.target.value))}
+                onChange={(event) =>
+                  setPostedWithinDays(Number(event.target.value))
+                }
               >
-                <option value={1}>Past day</option>
-                <option value={3}>Past 3 days</option>
-                <option value={7}>Past 7 days</option>
-                <option value={14}>Past 14 days</option>
-                <option value={30}>Past 30 days</option>
+                <option value={1}>{t("app.recommendations.pastDay")}</option>
+                <option value={3}>{t("app.recommendations.past3")}</option>
+                <option value={7}>{t("app.recommendations.past7")}</option>
+                <option value={14}>{t("app.recommendations.past14")}</option>
+                <option value={30}>{t("app.recommendations.past30")}</option>
               </select>
             </label>
 
-            <label className="text-sm text-slate-300">
-              Results
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.recommendations.results")}
               <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] focus:outline-none"
                 value={resultsPerPage}
-                onChange={(event) => setResultsPerPage(Number(event.target.value))}
+                onChange={(event) =>
+                  setResultsPerPage(Number(event.target.value))
+                }
               >
-                <option value={10}>10 jobs</option>
-                <option value={20}>20 jobs</option>
-                <option value={30}>30 jobs</option>
-                <option value={50}>50 jobs</option>
+                <option value={10}>
+                  {t("app.recommendations.jobsCount", { n: 10 })}
+                </option>
+                <option value={20}>
+                  {t("app.recommendations.jobsCount", { n: 20 })}
+                </option>
+                <option value={30}>
+                  {t("app.recommendations.jobsCount", { n: 30 })}
+                </option>
+                <option value={50}>
+                  {t("app.recommendations.jobsCount", { n: 50 })}
+                </option>
               </select>
             </label>
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-            <label className="text-sm text-slate-300">
-              Minimum Salary
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              {t("app.recommendations.salary")}
               <input
                 type="number"
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
                 value={salaryMin}
                 onChange={(event) => setSalaryMin(event.target.value)}
-                placeholder="80000"
+                placeholder={t("app.recommendations.salaryPh")}
               />
             </label>
 
-            <label className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+            <label className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
               <input
                 type="checkbox"
                 checked={remoteOnly}
                 onChange={(event) => setRemoteOnly(event.target.checked)}
               />
-              Remote only
+              {t("app.recommendations.remoteOnly")}
             </label>
           </div>
 
@@ -212,57 +226,66 @@ export default function RecommendationsPage() {
               type="button"
               onClick={handleFindJobs}
               disabled={loading}
-              className="rounded-lg bg-[#FFB238] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-[var(--color-accent)] px-5 py-3 font-semibold text-[var(--color-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Searching..." : "Find Jobs"}
+              {loading
+                ? t("app.recommendations.searching")
+                : t("app.recommendations.findJobs")}
             </button>
 
-            <p className="text-sm text-slate-400">
-              Results are ranked with your saved profile skills when available.
+            <p className="text-sm text-[var(--color-text-muted)]">
+              {t("app.recommendations.hint")}
             </p>
           </div>
         </section>
 
         {error && (
-          <div className="mt-6 rounded-lg border border-red-300/30 bg-red-500/10 p-4 text-sm text-red-100">
+          <div className="mt-6 rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] p-4 text-sm text-[var(--color-danger-text)]">
             {error}
           </div>
         )}
 
-        <div className="mt-8 flex items-center justify-between text-sm text-slate-300">
-          <p>{recommendations.length} recommendations found.</p>
+        <div className="mt-8 flex items-center justify-between text-sm text-[var(--color-text-secondary)]">
+          <p>
+            {t("app.recommendations.countFound", { n: recommendations.length })}
+          </p>
         </div>
 
         <section className="mt-6 grid gap-5">
           {recommendations.map((job) => (
             <article
               key={job.recommendation_id}
-              className="rounded-lg border border-white/10 bg-white/5 p-6"
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6"
             >
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-full border border-[#FFB238]/40 bg-[#FFB238]/10 px-3 py-1 text-xs text-[#FFB238]">
-                      Match {job.match_score}
+                    <span className="rounded-full border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10 px-3 py-1 text-xs text-[var(--color-text-accent)]">
+                      {t("app.recommendations.matchBadge", {
+                        score: job.match_score,
+                      })}
                     </span>
-                    <span className="text-xs text-slate-400">
-                      {job.source.toUpperCase()} · {formatDate(job.posting_date)}
+                    <span className="text-xs text-[var(--color-text-muted)]">
+                      {job.source.toUpperCase()} ·{" "}
+                      {formatDate(job.posting_date, locale)}
                     </span>
                   </div>
 
-                  <h2 className="mt-4 text-2xl font-bold text-white">
+                  <h2 className="mt-4 text-2xl font-bold text-[var(--color-text-primary)]">
                     {job.title}
                   </h2>
-                  <p className="mt-2 text-sm text-slate-300">
-                    {job.company || "Company not listed"} ·{" "}
-                    {job.location || "Location unknown"} · {job.work_mode}
+                  <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                    {job.company || t("app.recommendations.companyMissing")} ·{" "}
+                    {job.location ||
+                      t("app.recommendations.locationMissing")}{" "}
+                    · {job.work_mode}
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     {job.required_skills.map((skill) => (
                       <span
                         key={skill}
-                        className="rounded-full bg-[#FFB238]/15 px-3 py-1 text-xs text-[#FFB238]"
+                        className="rounded-full bg-[var(--color-accent)]/15 px-3 py-1 text-xs text-[var(--color-text-accent)]"
                       >
                         {skill}
                       </span>
@@ -278,13 +301,13 @@ export default function RecommendationsPage() {
                       savingId === job.recommendation_id ||
                       savedIds.has(job.recommendation_id)
                     }
-                    className="rounded-lg bg-[#FFB238] px-5 py-3 text-sm font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-[var(--color-accent)] px-5 py-3 text-sm font-semibold text-[var(--color-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {savedIds.has(job.recommendation_id)
-                      ? "Saved"
+                      ? t("app.recommendations.saved")
                       : savingId === job.recommendation_id
-                        ? "Saving..."
-                        : "Save to Dashboard"}
+                        ? t("app.recommendations.saving")
+                        : t("app.recommendations.saveToDashboard")}
                   </button>
 
                   {job.external_url && (
@@ -292,29 +315,41 @@ export default function RecommendationsPage() {
                       href={job.external_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg border border-[#FFB238]/40 px-5 py-3 text-sm font-semibold text-[#FFB238] transition hover:bg-white/10"
+                      className="rounded-lg border border-[var(--color-accent)]/40 px-5 py-3 text-sm font-semibold text-[var(--color-text-accent)] transition hover:bg-[var(--color-bg-elev-2)]"
                     >
-                      View Source
+                      {t("app.recommendations.viewSource")}
                     </a>
                   )}
                 </div>
               </div>
 
-              <p className="mt-5 text-sm leading-6 text-slate-300">
+              <p className="mt-5 text-sm leading-6 text-[var(--color-text-secondary)]">
                 {job.summary}
               </p>
 
               <div className="mt-5 grid gap-4 md:grid-cols-3">
-                <Meta label="Salary" value={job.salary_range || "Unknown"} />
-                <Meta label="Type" value={job.employment_type} />
-                <Meta label="Missing Skills" value={job.missing_skills.join(", ") || "None"} />
+                <Meta
+                  label={t("app.recommendations.metaSalary")}
+                  value={job.salary_range || t("app.recommendations.metaUnknown")}
+                />
+                <Meta
+                  label={t("app.recommendations.metaType")}
+                  value={job.employment_type}
+                />
+                <Meta
+                  label={t("app.recommendations.metaMissing")}
+                  value={
+                    job.missing_skills.join(", ") ||
+                    t("app.recommendations.none")
+                  }
+                />
               </div>
 
-              <div className="mt-5 rounded-lg border border-white/10 bg-white/5 p-4">
-                <h3 className="text-sm font-semibold text-[#FFB238]">
-                  Why this matched
+              <div className="mt-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4">
+                <h3 className="text-sm font-semibold text-[var(--color-text-accent)]">
+                  {t("app.recommendations.whyMatched")}
                 </h3>
-                <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-secondary)]">
                   {job.match_reasons.map((reason) => (
                     <li key={reason}>{reason}</li>
                   ))}
@@ -330,18 +365,21 @@ export default function RecommendationsPage() {
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-      <p className="text-xs uppercase text-slate-400">{label}</p>
-      <p className="mt-1 text-sm text-white">{value || "Unknown"}</p>
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-3">
+      <p className="text-xs uppercase text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-1 text-sm text-[var(--color-text-primary)]">
+        {value || "—"}
+      </p>
     </div>
   );
 }
 
-function formatDate(value: string) {
-  if (!value) return "Unknown";
+function formatDate(value: string, locale: string) {
+  if (!value) return "—";
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) return value;
-  return new Intl.DateTimeFormat("en-US", {
+  const intlLocale = locale === "zh" ? "zh-CN" : "en-US";
+  return new Intl.DateTimeFormat(intlLocale, {
     month: "short",
     day: "numeric",
     year: "numeric",

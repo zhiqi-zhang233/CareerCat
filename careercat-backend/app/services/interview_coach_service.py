@@ -32,6 +32,12 @@ def generate_interview_prep(job: dict):
         }
 
 
+_COACH_LOCALE_INSTRUCTION = {
+    "en": "Respond in English.",
+    "zh": "请使用简体中文回复。代码块、变量名、SQL 关键字等保持原样不要翻译。",
+}
+
+
 def generate_coach_reply(
     profile: dict | None,
     job: dict | None,
@@ -39,8 +45,14 @@ def generate_coach_reply(
     subtype: str | None,
     focus_topic: str | None,
     messages: list[dict],
+    locale: str = "en",
 ):
-    system_prompt = """
+    locale_directive = _COACH_LOCALE_INSTRUCTION.get(
+        locale, _COACH_LOCALE_INSTRUCTION["en"]
+    )
+    system_prompt = f"""
+{locale_directive}
+
 You are CareerCat Coach, a precise AI job-search mentor for technical job seekers.
 
 Your job is to help users close gaps for written assessments, technical interviews,

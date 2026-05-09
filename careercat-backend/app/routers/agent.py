@@ -25,6 +25,7 @@ def workflow_agent(
             message=payload.message,
             profile=profile,
             current_page=payload.current_page,
+            locale=payload.locale or "en",
         )
     except Exception as exc:
         record_agent_run(

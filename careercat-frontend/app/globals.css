@@ -36,6 +36,19 @@
   --brand-cream-100: #f7f1e1;
   --brand-cream-200: #efe4c8;
 
+  /* Blue (used as the primary accent inside the app shell — workspace
+     and downstream pages — to differentiate from the honey-themed
+     marketing surfaces). */
+  --brand-blue-50:  #eff6ff;
+  --brand-blue-100: #dbeafe;
+  --brand-blue-200: #bfdbfe;
+  --brand-blue-300: #93c5fd;
+  --brand-blue-400: #60a5fa;
+  --brand-blue-500: #3b82f6;
+  --brand-blue-600: #2563eb;
+  --brand-blue-700: #1d4ed8;
+  --brand-blue-800: #1e40af;
+
   /* Neutral surfaces */
   --neutral-0:   #ffffff;
   --neutral-50:  #f8f9fc;
@@ -62,6 +75,24 @@
   --color-info-50:     #e8f1ff;
   --color-info-400:    #3b82f6;
   --color-info-600:    #1d4ed8;
+
+  /* Status — surface-aware semantic tokens. The text/bg tokens swap shades
+     between dark and light surfaces so chips and pills stay legible. */
+  --color-success-text: var(--color-success-400);
+  --color-success-bg:   color-mix(in srgb, var(--color-success-400) 12%, transparent);
+  --color-success-border: color-mix(in srgb, var(--color-success-400) 30%, transparent);
+
+  --color-warning-text: var(--color-warning-400);
+  --color-warning-bg:   color-mix(in srgb, var(--color-warning-400) 12%, transparent);
+  --color-warning-border: color-mix(in srgb, var(--color-warning-400) 30%, transparent);
+
+  --color-danger-text: var(--color-danger-400);
+  --color-danger-bg:   color-mix(in srgb, var(--color-danger-400) 12%, transparent);
+  --color-danger-border: color-mix(in srgb, var(--color-danger-400) 30%, transparent);
+
+  --color-info-text: var(--color-info-400);
+  --color-info-bg:   color-mix(in srgb, var(--color-info-400) 12%, transparent);
+  --color-info-border: color-mix(in srgb, var(--color-info-400) 30%, transparent);
 
   /* Semantic tokens — DEFAULT (dark-mode app shell) */
   --color-bg:          var(--brand-ink-700);
@@ -127,6 +158,39 @@
   --color-accent:        var(--brand-honey-400);
   --color-accent-hover:  var(--brand-honey-500);
   --color-accent-text:   var(--brand-ink-700);
+
+  /* Status text tokens swap to deeper shades on light surfaces. */
+  --color-success-text:  var(--color-success-600);
+  --color-warning-text:  var(--color-warning-600);
+  --color-danger-text:   var(--color-danger-600);
+  --color-info-text:     var(--color-info-600);
+}
+
+/* App shell theme: blue accent on a near-white base. The marketing
+   pages stay honey/amber so the surfaces remain visually distinct. */
+[data-theme="app"] {
+  --color-bg:          var(--neutral-50);
+  --color-bg-elev-1:   #ffffff;
+  --color-bg-elev-2:   #f4f6fb;
+  --color-bg-inverse:  var(--brand-blue-700);
+
+  --color-border:        var(--neutral-200);
+  --color-border-strong: var(--neutral-300);
+
+  --color-text-primary:   var(--neutral-900);
+  --color-text-secondary: var(--neutral-700);
+  --color-text-muted:     var(--neutral-500);
+  --color-text-inverse:   var(--neutral-0);
+  --color-text-accent:    var(--brand-blue-700);
+
+  --color-accent:        var(--brand-blue-500);
+  --color-accent-hover:  var(--brand-blue-600);
+  --color-accent-text:   #ffffff;
+
+  --color-success-text:  var(--color-success-600);
+  --color-warning-text:  var(--color-warning-600);
+  --color-danger-text:   var(--color-danger-600);
+  --color-info-text:     var(--color-info-600);
 }
 
 @theme inline {
@@ -284,13 +348,41 @@ body {
   100% { transform: translateX(100%); }
 }
 
-/* Subtle decorative gradient text used in marketing hero */
+/* Subtle decorative gradient text used in marketing hero. The default
+   gradient is tuned for dark surfaces; light surfaces override with
+   deeper honey shades so the text never washes out on white. */
 .cc-gradient-text {
   background: linear-gradient(
     100deg,
     var(--brand-honey-400) 0%,
     var(--brand-honey-200) 50%,
     var(--brand-honey-400) 100%
+  );
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+  animation: cc-shimmer 6s linear infinite;
+}
+[data-surface="light"] .cc-gradient-text {
+  background: linear-gradient(
+    100deg,
+    var(--brand-honey-600) 0%,
+    var(--brand-honey-400) 50%,
+    var(--brand-honey-600) 100%
+  );
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+  animation: cc-shimmer 6s linear infinite;
+}
+[data-theme="app"] .cc-gradient-text {
+  background: linear-gradient(
+    100deg,
+    var(--brand-blue-700) 0%,
+    var(--brand-blue-500) 50%,
+    var(--brand-blue-700) 100%
   );
   -webkit-background-clip: text;
           background-clip: text;

@@ -1,93 +1,85 @@
+"use client";
+
 import Link from "next/link";
-
-const TIERS = [
-  {
-    name: "Free",
-    price: "$0",
-    cadence: "forever",
-    tagline: "Test the workflow at your own pace.",
-    features: [
-      "5 AI resume / JD parses per month",
-      "50 saved jobs",
-      "Workflow agent + application dashboard",
-      "3 coach sessions per week",
-      "Sponsorship-aware recommendations",
-    ],
-    cta: { label: "Start free", href: "/workspace" },
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: "$14.9",
-    cadence: "per month",
-    tagline: "For active job seekers in motion.",
-    features: [
-      "Unlimited AI parsing",
-      "Multiple resume versions per role",
-      "Unlimited coach sessions",
-      "Insights dashboard with funnel & response time",
-      "In-app follow-up reminders",
-      "Saved-job export to CSV",
-    ],
-    cta: { label: "Go Pro", href: "/workspace?upgrade=pro" },
-    highlight: true,
-  },
-  {
-    name: "Career+",
-    price: "$29.9",
-    cadence: "per month",
-    tagline: "Power tools for power searches.",
-    features: [
-      "Everything in Pro",
-      "Chrome extension for one-click JD import",
-      "Email follow-up reminders",
-      "Multi-resume A/B response analytics",
-      "1 mentor review per month",
-      "Priority support",
-    ],
-    cta: { label: "Contact us", href: "mailto:hello@careercat.ai" },
-    highlight: false,
-  },
-];
-
-const FAQ = [
-  {
-    q: "Can I cancel anytime?",
-    a: "Yes. Subscriptions are month-to-month. You'll keep paid access until the end of the current period.",
-  },
-  {
-    q: "Do you store my resume?",
-    a: "Your parsed resume is stored under your CareerCat account so you can edit it across devices. You can wipe it from Profile at any time.",
-  },
-  {
-    q: "Is the AI good enough on the free plan?",
-    a: "Yes — every plan uses the same models. The free plan caps how many AI parses you can run per month and how often you can use the coach.",
-  },
-  {
-    q: "Do you offer student or non-profit discounts?",
-    a: "Yes. Email us from your school address and we'll set you up.",
-  },
-];
+import { useT } from "@/lib/i18n/LocaleProvider";
 
 export default function PricingPage() {
+  const t = useT();
+
+  const tiers = [
+    {
+      name: t("pricing.free.name"),
+      price: "$0",
+      cadence: t("pricing.free.cadence"),
+      tagline: t("pricing.free.tagline"),
+      features: [
+        t("pricing.free.f1"),
+        t("pricing.free.f2"),
+        t("pricing.free.f3"),
+        t("pricing.free.f4"),
+        t("pricing.free.f5"),
+      ],
+      cta: { label: t("pricing.free.cta"), href: "/workspace" },
+      highlight: false,
+    },
+    {
+      name: t("pricing.pro.name"),
+      price: "$14.9",
+      cadence: t("pricing.pro.cadence"),
+      tagline: t("pricing.pro.tagline"),
+      features: [
+        t("pricing.pro.f1"),
+        t("pricing.pro.f2"),
+        t("pricing.pro.f3"),
+        t("pricing.pro.f4"),
+        t("pricing.pro.f5"),
+        t("pricing.pro.f6"),
+      ],
+      cta: { label: t("pricing.pro.cta"), href: "/workspace?upgrade=pro" },
+      highlight: true,
+    },
+    {
+      name: t("pricing.careerPlus.name"),
+      price: "$29.9",
+      cadence: t("pricing.careerPlus.cadence"),
+      tagline: t("pricing.careerPlus.tagline"),
+      features: [
+        t("pricing.careerPlus.f1"),
+        t("pricing.careerPlus.f2"),
+        t("pricing.careerPlus.f3"),
+        t("pricing.careerPlus.f4"),
+        t("pricing.careerPlus.f5"),
+        t("pricing.careerPlus.f6"),
+      ],
+      cta: { label: t("pricing.careerPlus.cta"), href: "mailto:hello@careercat.ai" },
+      highlight: false,
+    },
+  ];
+
+  const faq = [
+    { q: t("pricing.faq.q1"), a: t("pricing.faq.a1") },
+    { q: t("pricing.faq.q2"), a: t("pricing.faq.a2") },
+    { q: t("pricing.faq.q3"), a: t("pricing.faq.a3") },
+    { q: t("pricing.faq.q4"), a: t("pricing.faq.a4") },
+  ];
+
   return (
     <>
       <section className="mx-auto max-w-4xl px-4 pt-16 text-center lg:px-8">
         <p className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-accent)]">
-          Pricing
+          {t("pricing.page.eyebrow")}
         </p>
         <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
-          Pay only when CareerCat is doing the heavy lifting.
+          {t("pricing.page.title")}
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-[var(--color-text-secondary)]">
-          Start free. Upgrade once you&apos;re juggling more than 50 saved jobs or
-          actively prepping for interviews every week.
+          {t("pricing.page.body")}
         </p>
       </section>
 
       <section className="mx-auto mt-12 max-w-7xl px-4 lg:px-8">
         <div className="grid gap-6 md:grid-cols-3">
-          {TIERS.map((tier) => (
+          {tiers.map((tier) => (
             <div
               key={tier.name}
               className={`flex flex-col rounded-[var(--radius-lg)] border p-7 transition ${
@@ -100,7 +92,7 @@ export default function PricingPage() {
                 <p className="text-sm font-semibold">{tier.name}</p>
                 {tier.highlight && (
                   <span className="cc-chip border-[var(--color-accent)]/40 bg-[var(--color-accent)]/15 text-[var(--color-text-accent)]">
-                    Most popular
+                    {t("pricing.page.mostPopular")}
                   </span>
                 )}
               </div>
@@ -137,10 +129,15 @@ export default function PricingPage() {
       </section>
 
       <section className="mx-auto mt-20 max-w-4xl px-4 lg:px-8">
-        <h2 className="text-2xl font-bold tracking-tight">Frequently asked</h2>
+        <h2 className="text-2xl font-bold tracking-tight">
+          {t("pricing.faq.heading")}
+        </h2>
         <dl className="mt-8 divide-y divide-[var(--color-border)] rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-elev-1)]">
-          {FAQ.map((item) => (
-            <div key={item.q} className="grid gap-2 px-5 py-5 md:grid-cols-[200px_1fr] md:gap-6">
+          {faq.map((item) => (
+            <div
+              key={item.q}
+              className="grid gap-2 px-5 py-5 md:grid-cols-[200px_1fr] md:gap-6"
+            >
               <dt className="font-semibold">{item.q}</dt>
               <dd className="text-sm leading-6 text-[var(--color-text-secondary)]">
                 {item.a}

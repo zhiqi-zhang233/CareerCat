@@ -26,8 +26,24 @@ ALLOWED_TOOLS = {
 }
 
 
-def decide_next_step(message: str, profile: dict | None, current_page: str = "/workspace"):
-    system_prompt = """
+_LOCALE_INSTRUCTION = {
+    "en": "Respond in English. Use clear, concise English for every user-facing string (reply, follow_up_question, workflow_goal, stage titles, stage actions, stage outputs).",
+    "zh": "请用简体中文回复。所有面向用户的字段（reply、follow_up_question、workflow_goal、stages 中的 title/action/output）都使用简体中文撰写，但保持 JSON 字段名、tool 名称、route 字符串和 stage id 为英文。",
+}
+
+
+def decide_next_step(
+    message: str,
+    profile: dict | None,
+    current_page: str = "/workspace",
+    locale: str = "en",
+):
+    locale_directive = _LOCALE_INSTRUCTION.get(locale, _LOCALE_INSTRUCTION["en"])
+    system_prompt = f"""
+{locale_directive}
+
+"""
+    system_prompt += """
 You are CareerCat Workflow Coordinator, a multi-stage planning agent for an AI job-search web app.
 
 CareerCat has these tools and pages:
@@ -133,7 +149,7 @@ User message:
         )
     except Exception as e:
         print(f"[Workflow Coordinator] Bedrock decision failed, using fallback. Error: {e}")
-        decision = _fallback_decision(message)
+        decision = _fallback_decision(message, locale)
 
     return _normalize_decision(decision)
 
@@ -210,79 +226,120 @@ def _route_for_tool(selected_tool: str):
     }.get(selected_tool, "/workspace")
 
 
-def _fallback_decision(message: str):
+_FALLBACK_COPY = {
+    "en": {
+        "general_reply": "Hi, I can help you set up your profile, find jobs, import job posts, track applications, or practice interviews. What would you like to work on first?",
+        "general_followup": "Do you want to set up your profile, find jobs, import a job post, track applications, or practice interviews?",
+        "general_reason": "The message does not contain a clear CareerCat workflow request yet.",
+        "general_goal": "Choose the right CareerCat workflow.",
+        "broad_reply": "I can help with profile setup, job discovery, job import, application tracking, or coaching. What would you like to do first?",
+        "broad_reason": "The user request is too broad to choose a workflow.",
+        "broad_goal": "Choose the next job-search workflow.",
+        "search_reply": "I can help you find fresh job matches. Open Recommendations and I will use your keywords and location.",
+        "search_reason": "The user is asking to discover job opportunities.",
+        "search_goal": "Find relevant jobs and prioritize the next application steps.",
+        "interview_reply": "I can start a coaching session for interview practice.",
+        "interview_reason": "The user is asking for interview preparation.",
+        "interview_goal": "Prepare for an interview with targeted practice.",
+        "practice_reply": "I can help you train for written assessments and technical screens.",
+        "practice_reason": "The user is asking for skill practice.",
+        "practice_goal": "Practice for a written assessment or technical screen.",
+    },
+    "zh": {
+        "general_reply": "你好，我可以帮你设置个人资料、查找岗位、导入岗位描述、追踪投递或练习面试。你想先做哪一项？",
+        "general_followup": "你想先做哪一项：设置个人资料、查找岗位、导入岗位、追踪投递，还是练习面试？",
+        "general_reason": "目前的消息还没有明确的 CareerCat 工作流意图。",
+        "general_goal": "选择合适的 CareerCat 工作流。",
+        "broad_reply": "我可以帮你做个人资料设置、岗位发现、岗位导入、投递追踪或求职辅导。你想先做哪一项？",
+        "broad_reason": "用户的请求太宽泛，难以直接选择工作流。",
+        "broad_goal": "确定下一步求职工作流。",
+        "search_reply": "我可以帮你寻找匹配岗位。打开「岗位推荐」，我会基于你的关键词和地点搜索。",
+        "search_reason": "用户在请求发现岗位机会。",
+        "search_goal": "找到相关岗位并安排接下来的投递。",
+        "interview_reply": "我可以开启一段辅导会话来练习面试。",
+        "interview_reason": "用户在请求面试准备。",
+        "interview_goal": "通过针对性练习为面试做准备。",
+        "practice_reply": "我可以帮你针对笔试和技术筛选做练习。",
+        "practice_reason": "用户在请求技能练习。",
+        "practice_goal": "为笔试或技术筛选做练习。",
+    },
+}
+
+
+def _fallback_decision(message: str, locale: str = "en"):
+    copy = _FALLBACK_COPY.get(locale, _FALLBACK_COPY["en"])
     lower = message.strip().lower()
 
     if _looks_like_general_or_empty_input(lower):
         return {
-            "reply": "Hi, I can help you set up your profile, find jobs, import job posts, track applications, or practice interviews. What would you like to work on first?",
+            "reply": copy["general_reply"],
             "intent": "general_guidance",
             "selected_tool": "offer_platform_guidance",
             "route": "/workspace",
-            "reason": "The message does not contain a clear CareerCat workflow request yet.",
+            "reason": copy["general_reason"],
             "needs_user_input": True,
-            "follow_up_question": "Do you want to set up your profile, find jobs, import a job post, track applications, or practice interviews?",
+            "follow_up_question": copy["general_followup"],
             "tool_args": {},
-            "workflow_goal": "Choose the right CareerCat workflow.",
+            "workflow_goal": copy["general_goal"],
             "current_stage_id": "clarify_goal",
             "stages": _guidance_stages(),
         }
 
-    if any(word in lower for word in ["find", "search", "recommend", "jobs", "roles"]):
+    if any(word in lower for word in ["find", "search", "recommend", "jobs", "roles", "找", "搜", "推荐", "岗位"]):
         return {
-            "reply": "I can help you find fresh job matches. Open Recommendations and I will use your keywords and location.",
+            "reply": copy["search_reply"],
             "intent": "job_discovery",
             "selected_tool": "search_adzuna_jobs",
             "route": "/recommendations",
-            "reason": "The user is asking to discover job opportunities.",
+            "reason": copy["search_reason"],
             "needs_user_input": False,
             "follow_up_question": None,
             "tool_args": {},
-            "workflow_goal": "Find relevant jobs and prioritize the next application steps.",
+            "workflow_goal": copy["search_goal"],
             "current_stage_id": "search_jobs",
             "stages": _job_search_stages(),
         }
 
-    if any(word in lower for word in ["interview", "mock", "behavioral", "technical"]):
+    if any(word in lower for word in ["interview", "mock", "behavioral", "technical", "面试", "模拟"]):
         return {
-            "reply": "I can start a coaching session for interview practice.",
+            "reply": copy["interview_reply"],
             "intent": "mock_interview",
             "selected_tool": "start_mock_interview",
             "route": "/coach",
-            "reason": "The user is asking for interview preparation.",
+            "reason": copy["interview_reason"],
             "needs_user_input": False,
             "follow_up_question": None,
             "tool_args": {"mode": "mock_interview"},
-            "workflow_goal": "Prepare for an interview with targeted practice.",
+            "workflow_goal": copy["interview_goal"],
             "current_stage_id": "start_coach",
             "stages": _coach_stages("mock_interview"),
         }
 
-    if any(word in lower for word in ["assessment", "practice", "sql", "python", "coding"]):
+    if any(word in lower for word in ["assessment", "practice", "sql", "python", "coding", "笔试", "练习"]):
         return {
-            "reply": "I can help you train for written assessments and technical screens.",
+            "reply": copy["practice_reply"],
             "intent": "written_practice",
             "selected_tool": "start_written_practice",
             "route": "/coach",
-            "reason": "The user is asking for skill practice.",
+            "reason": copy["practice_reason"],
             "needs_user_input": False,
             "follow_up_question": None,
             "tool_args": {"mode": "written_practice"},
-            "workflow_goal": "Practice for a written assessment or technical screen.",
+            "workflow_goal": copy["practice_goal"],
             "current_stage_id": "start_coach",
             "stages": _coach_stages("written_practice"),
         }
 
     return {
-        "reply": "I can help with profile setup, job discovery, job import, application tracking, or coaching. What would you like to do first?",
+        "reply": copy["broad_reply"],
         "intent": "general_guidance",
         "selected_tool": "offer_platform_guidance",
         "route": "/workspace",
-        "reason": "The user request is too broad to choose a workflow.",
+        "reason": copy["broad_reason"],
         "needs_user_input": True,
-        "follow_up_question": "Would you like to set up your profile, find jobs, import a job post, track applications, or practice interviews?",
+        "follow_up_question": copy["general_followup"],
         "tool_args": {},
-        "workflow_goal": "Choose the next job-search workflow.",
+        "workflow_goal": copy["broad_goal"],
         "current_stage_id": "clarify_goal",
         "stages": _guidance_stages(),
     }

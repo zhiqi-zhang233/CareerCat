@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import { createJobPost, parseJobPost } from "@/lib/api";
 import type { JobPost } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
+import { useT } from "@/lib/i18n/LocaleProvider";
 
 type ImportResult = {
   message: string;
@@ -15,6 +16,7 @@ type ImportResult = {
 };
 
 export default function ImportJobsPage() {
+  const t = useT();
   const userId = useLocalUserId();
   const [jobText, setJobText] = useState("");
   const [draftJob, setDraftJob] = useState<JobPost | null>(null);
@@ -31,12 +33,12 @@ export default function ImportJobsPage() {
 
   const handleParseJob = async () => {
     if (!userId) {
-      setError("Your account is still loading. Please try again.");
+      setError(t("app.importJobs.errAccountLoading"));
       return;
     }
 
     if (!jobText.trim()) {
-      setError("Paste a job post before parsing.");
+      setError(t("app.importJobs.errEmpty"));
       return;
     }
 
@@ -52,7 +54,7 @@ export default function ImportJobsPage() {
       setWarning(data.warning || "");
     } catch (parseError) {
       console.error(parseError);
-      setError("Failed to parse this job post.");
+      setError(t("app.importJobs.errParse"));
       setDraftJob(null);
       setWarning("");
     } finally {
@@ -93,54 +95,54 @@ export default function ImportJobsPage() {
 
       if (data.blocked && !forceSave) {
         const saveAnyway = window.confirm(
-          `${data.warning || "This job may not match your sponsorship settings."}\n\nSave it anyway?`
+          `${data.warning || t("app.importJobs.defaultBlockedWarning")}\n\n${t("app.importJobs.saveAnyway")}`
         );
 
         if (saveAnyway) {
           await handleSaveJob(true);
         } else {
           setWarning(data.warning || "");
-          setError("Review the parsed content before saving.");
+          setError(t("app.importJobs.reviewBeforeSaving"));
         }
         return;
       }
 
       setDraftJob(normalizeJob(data.parsed_job));
       setWarning("");
-      setSavedMessage("Job saved to your dashboard.");
+      setSavedMessage(t("app.importJobs.savedMessage"));
     } catch (saveError) {
       console.error(saveError);
-      setError("Failed to save this job.");
+      setError(t("app.importJobs.errSave"));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#011A55] text-white">
+    <main className="min-h-screen text-[var(--color-text-primary)]">
       <Header />
 
       <section className="mx-auto max-w-7xl px-6 py-16">
         <div className="max-w-3xl">
-          <p className="text-sm font-medium text-[#FFB238]">AI Job Parser</p>
-          <h1 className="mt-3 text-4xl font-bold text-[#FFB238]">
-            Import a Job Post
+          <p className="text-sm font-medium text-[var(--color-text-accent)]">
+            {t("app.importJobs.eyebrow")}
+          </p>
+          <h1 className="mt-3 text-4xl font-bold text-[var(--color-text-accent)]">
+            {t("app.importJobs.title")}
           </h1>
-          <p className="mt-4 text-slate-300">
-            Paste one job description, let CareerCat parse it, review the
-            extracted fields, edit anything that looks wrong, and then save the
-            final version to your dashboard.
+          <p className="mt-4 text-[var(--color-text-secondary)]">
+            {t("app.importJobs.subtitle")}
           </p>
         </div>
 
         <div className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <section className="rounded-lg border border-white/10 bg-white/5 p-6">
-            <label className="text-sm font-semibold text-[#FFB238]">
-              Job Description
+          <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
+            <label className="text-sm font-semibold text-[var(--color-text-accent)]">
+              {t("app.importJobs.jdLabel")}
             </label>
             <textarea
-              placeholder="Paste the full job description here..."
-              className="mt-4 min-h-[420px] w-full rounded-lg border border-white/10 bg-white/10 p-4 text-white placeholder-slate-400 focus:outline-none"
+              placeholder={t("app.importJobs.jdPlaceholder")}
+              className="mt-4 min-h-[420px] w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-4 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
               value={jobText}
               onChange={(event) => setJobText(event.target.value)}
             />
@@ -150,150 +152,217 @@ export default function ImportJobsPage() {
                 type="button"
                 onClick={handleParseJob}
                 disabled={parsing}
-                className="rounded-lg bg-[#FFB238] px-5 py-3 font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-[var(--color-accent)] px-5 py-3 font-semibold text-[var(--color-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {parsing ? "Parsing with AI..." : "Parse Job"}
+                {parsing
+                  ? t("app.importJobs.parsingBtn")
+                  : t("app.importJobs.parseBtn")}
               </button>
 
               <Link
                 href="/dashboard"
-                className="rounded-lg border border-[#FFB238]/40 px-5 py-3 text-sm font-medium text-[#FFB238] transition hover:bg-white/10"
+                className="rounded-lg border border-[var(--color-accent)]/40 px-5 py-3 text-sm font-medium text-[var(--color-text-accent)] transition hover:bg-[var(--color-bg-elev-2)]"
               >
-                Open Dashboard
+                {t("app.importJobs.openDashboard")}
               </Link>
             </div>
 
             {error && (
-              <div className="mt-4 rounded-lg border border-red-300/30 bg-red-500/10 p-4 text-sm text-red-100">
+              <div className="mt-4 rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] p-4 text-sm text-[var(--color-danger-text)]">
                 {error}
               </div>
             )}
 
             {savedMessage && (
-              <div className="mt-4 rounded-lg border border-green-300/30 bg-green-500/10 p-4 text-sm text-green-100">
+              <div className="mt-4 rounded-lg border border-[var(--color-success-border)] bg-[var(--color-success-bg)] p-4 text-sm text-[var(--color-success-text)]">
                 {savedMessage}
               </div>
             )}
           </section>
 
-          <aside className="rounded-lg border border-white/10 bg-white/5 p-6">
+          <aside className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-6">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-lg font-semibold text-[#FFB238]">
-                Editable Parsed Preview
+              <h2 className="text-lg font-semibold text-[var(--color-text-accent)]">
+                {t("app.importJobs.previewTitle")}
               </h2>
               {draftJob && (
                 <button
                   type="button"
                   onClick={() => handleSaveJob(false)}
                   disabled={saving}
-                  className="rounded-lg bg-[#FFB238] px-4 py-2 text-sm font-semibold text-[#011A55] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-[var(--color-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? "Saving..." : "Save to Dashboard"}
+                  {saving
+                    ? t("app.importJobs.savingBtn")
+                    : t("app.importJobs.saveBtn")}
                 </button>
               )}
             </div>
 
             {!draftJob ? (
-              <p className="mt-4 text-sm leading-6 text-slate-300">
-                Parsed job details will appear here after AI parsing. You can
-                edit the extracted content before saving.
+              <p className="mt-4 text-sm leading-6 text-[var(--color-text-secondary)]">
+                {t("app.importJobs.previewEmpty")}
               </p>
             ) : (
               <div className="mt-5 space-y-5">
                 {warning && (
-                  <div className="rounded-lg border border-red-300/30 bg-red-500/10 p-4 text-sm text-red-100">
+                  <div className="rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-bg)] p-4 text-sm text-[var(--color-danger-text)]">
                     {warning}
                   </div>
                 )}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <TextField
-                    label="Job Title"
+                    label={t("app.importJobs.fJobTitle")}
                     value={draftJob.title}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, title: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current ? { ...current, title: value } : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Company"
+                    label={t("app.importJobs.fCompany")}
                     value={draftJob.company}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, company: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current ? { ...current, company: value } : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Location"
+                    label={t("app.importJobs.fLocation")}
                     value={draftJob.location}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, location: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current ? { ...current, location: value } : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Salary"
+                    label={t("app.importJobs.fSalary")}
                     value={draftJob.salary_range}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, salary_range: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current ? { ...current, salary_range: value } : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Work Mode"
+                    label={t("app.importJobs.fWorkMode")}
                     value={draftJob.work_mode}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, work_mode: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current ? { ...current, work_mode: value } : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Employment Type"
+                    label={t("app.importJobs.fEmploymentType")}
                     value={draftJob.employment_type}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, employment_type: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current
+                          ? { ...current, employment_type: value }
+                          : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Seniority"
+                    label={t("app.importJobs.fSeniority")}
                     value={draftJob.seniority}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, seniority: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current ? { ...current, seniority: value } : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Sponsorship"
+                    label={t("app.importJobs.fSponsorship")}
                     value={draftJob.visa_sponsorship}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, visa_sponsorship: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current
+                          ? { ...current, visa_sponsorship: value }
+                          : current
+                      )
+                    }
                   />
                   <TextField
-                    label="Posting Date"
+                    label={t("app.importJobs.fPostingDate")}
                     value={draftJob.posting_date}
-                    onChange={(value) => setDraftJob((current) => current ? { ...current, posting_date: value } : current)}
+                    onChange={(value) =>
+                      setDraftJob((current) =>
+                        current ? { ...current, posting_date: value } : current
+                      )
+                    }
                   />
                 </div>
 
                 <ListEditor
-                  label="Required Skills"
+                  label={t("app.importJobs.fRequiredSkills")}
                   value={draftJob.required_skills}
-                  onChange={(value) => setDraftJob((current) => current ? { ...current, required_skills: value } : current)}
-                  placeholder="Python, SQL, Tableau"
+                  onChange={(value) =>
+                    setDraftJob((current) =>
+                      current ? { ...current, required_skills: value } : current
+                    )
+                  }
+                  placeholder={t("app.importJobs.phRequiredSkills")}
                 />
 
                 <ListEditor
-                  label="Preferred Skills"
+                  label={t("app.importJobs.fPreferredSkills")}
                   value={draftJob.preferred_skills}
-                  onChange={(value) => setDraftJob((current) => current ? { ...current, preferred_skills: value } : current)}
-                  placeholder="dbt, Airflow, Snowflake"
+                  onChange={(value) =>
+                    setDraftJob((current) =>
+                      current
+                        ? { ...current, preferred_skills: value }
+                        : current
+                    )
+                  }
+                  placeholder={t("app.importJobs.phPreferredSkills")}
                 />
 
                 <ListEditor
-                  label="Requirements"
+                  label={t("app.importJobs.fRequirements")}
                   value={draftJob.requirements}
-                  onChange={(value) => setDraftJob((current) => current ? { ...current, requirements: value } : current)}
-                  placeholder="One requirement per line"
+                  onChange={(value) =>
+                    setDraftJob((current) =>
+                      current ? { ...current, requirements: value } : current
+                    )
+                  }
+                  placeholder={t("app.importJobs.phRequirements")}
                   multiline
                 />
 
                 <ListEditor
-                  label="Responsibilities"
+                  label={t("app.importJobs.fResponsibilities")}
                   value={draftJob.responsibilities}
-                  onChange={(value) => setDraftJob((current) => current ? { ...current, responsibilities: value } : current)}
-                  placeholder="One responsibility per line"
+                  onChange={(value) =>
+                    setDraftJob((current) =>
+                      current
+                        ? { ...current, responsibilities: value }
+                        : current
+                    )
+                  }
+                  placeholder={t("app.importJobs.phResponsibilities")}
                   multiline
                 />
 
                 <TextAreaField
-                  label="Summary"
+                  label={t("app.importJobs.fSummary")}
                   value={draftJob.summary}
-                  onChange={(value) => setDraftJob((current) => current ? { ...current, summary: value } : current)}
+                  onChange={(value) =>
+                    setDraftJob((current) =>
+                      current ? { ...current, summary: value } : current
+                    )
+                  }
                   rows={5}
                 />
 
-                <details className="rounded-lg border border-white/10 bg-white/5 p-4">
-                  <summary className="cursor-pointer text-sm font-semibold text-[#FFB238]">
-                    Raw job text
+                <details className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-accent)]">
+                    {t("app.importJobs.rawHeading")}
                   </summary>
                   <TextAreaField
                     label=""
@@ -310,14 +379,14 @@ export default function ImportJobsPage() {
 
                 {skillPreview.length > 0 && (
                   <div>
-                    <p className="text-xs uppercase text-slate-400">
-                      Quick Skill Preview
+                    <p className="text-xs uppercase text-[var(--color-text-muted)]">
+                      {t("app.importJobs.skillPreview")}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {skillPreview.map((skill) => (
                         <span
                           key={skill}
-                          className="rounded-full bg-[#FFB238]/15 px-3 py-1 text-xs text-[#FFB238]"
+                          className="rounded-full bg-[var(--color-accent)]/15 px-3 py-1 text-xs text-[var(--color-text-accent)]"
                         >
                           {skill}
                         </span>
@@ -371,10 +440,10 @@ function TextField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="text-sm text-slate-300">
+    <label className="text-sm text-[var(--color-text-secondary)]">
       {label}
       <input
-        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -394,10 +463,10 @@ function TextAreaField({
   rows: number;
 }) {
   return (
-    <label className="block text-sm text-slate-300">
+    <label className="block text-sm text-[var(--color-text-secondary)]">
       {label && <span>{label}</span>}
       <textarea
-        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -422,23 +491,17 @@ function ListEditor({
   const serialized = multiline ? value.join("\n") : value.join(", ");
 
   const handleChange = (nextValue: string) => {
-    const items = multiline
-      ? nextValue.split("\n")
-      : nextValue.split(",");
+    const items = multiline ? nextValue.split("\n") : nextValue.split(",");
 
-    onChange(
-      items
-        .map((item) => item.trim())
-        .filter(Boolean)
-    );
+    onChange(items.map((item) => item.trim()).filter(Boolean));
   };
 
   if (multiline) {
     return (
-      <label className="block text-sm text-slate-300">
+      <label className="block text-sm text-[var(--color-text-secondary)]">
         {label}
         <textarea
-          className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+          className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
           rows={5}
           value={serialized}
           placeholder={placeholder}
@@ -449,10 +512,10 @@ function ListEditor({
   }
 
   return (
-    <label className="block text-sm text-slate-300">
+    <label className="block text-sm text-[var(--color-text-secondary)]">
       {label}
       <input
-        className="mt-2 w-full rounded-lg border border-white/10 bg-white/10 p-3 text-white placeholder-slate-400 focus:outline-none"
+        className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-2)] p-3 text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none"
         value={serialized}
         placeholder={placeholder}
         onChange={(event) => handleChange(event.target.value)}
