@@ -33,6 +33,8 @@ type AuthContextValue = {
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   confirmSignUp: (email: string, code: string) => Promise<void>;
   resendConfirmationCode: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   signOut: () => void;
   createNewLocalAccount: () => void;
   clearError: () => void;
@@ -195,6 +197,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const forgotPassword = useCallback(async (nextEmail: string) => {
+    const userPool = getUserPool();
+    if (!userPool) throw new Error("Cognito is not configured.");
+    const user = new CognitoUser({ Username: nextEmail, Pool: userPool });
+    await new Promise<void>((resolve, reject) => {
+      user.forgotPassword({
+        onSuccess: () => resolve(),
+        onFailure: (err) => reject(err),
+      });
+    });
+  }, []);
+
+  const confirmForgotPassword = useCallback(async (nextEmail: string, code: string, newPassword: string) => {
+    const userPool = getUserPool();
+    if (!userPool) throw new Error("Cognito is not configured.");
+    const user = new CognitoUser({ Username: nextEmail, Pool: userPool });
+    await new Promise<void>((resolve, reject) => {
+      user.confirmPassword(code, newPassword, {
+        onSuccess: () => resolve(),
+        onFailure: (err) => reject(err),
+      });
+    });
+  }, []);
+
   const signOut = useCallback(() => {
     if (isCognito) {
       getUserPool()?.getCurrentUser()?.signOut();
@@ -226,15 +252,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       confirmSignUp,
       resendConfirmationCode,
+      forgotPassword,
+      confirmForgotPassword,
       signOut,
       createNewLocalAccount,
       clearError: () => setError(""),
     }),
     [
       confirmSignUp,
+      confirmForgotPassword,
       createNewLocalAccount,
       email,
       error,
+      forgotPassword,
       isCognito,
       isConfigured,
       signIn,
