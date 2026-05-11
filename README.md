@@ -1,600 +1,387 @@
-# CareerCat
+<div align="center">
 
-**Author:** Zhiqi Zhang
+# 🐱 CareerCat
 
-**Website:** https://main.d2taej5h07fd9k.amplifyapp.com
+### Your Agentic AI Job-Search Workspace
 
-CareerCat is an agentic AI job search assistant that helps users turn a messy, multi-step job search into a structured workspace. It supports resume-based profile setup, AI job post parsing, job recommendations, application tracking, and interview or written assessment coaching through a multi-stage workflow agent.
+**[English](#english) · [中文](#中文)**
 
-The main pain point CareerCat addresses is that job seekers often have to manually copy jobs, track applications in spreadsheets, interpret resume-job fit, and prepare for interviews across disconnected tools. CareerCat brings those steps into one account-based web app where an LLM can decide which workflow or tool should handle the user's request.
+[![Live · Production](https://img.shields.io/badge/Production-main.d2taej5h07fd9k.amplifyapp.com-1f6feb?style=for-the-badge&logo=amazonaws)](https://main.d2taej5h07fd9k.amplifyapp.com)
+[![Preview · v2](https://img.shields.io/badge/Preview%20v2-feature--v2--upgrade-7c3aed?style=for-the-badge&logo=amazonaws)](https://feature-v2-upgrade.d2taej5h07fd9k.amplifyapp.com)
+
+[![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.11-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Amazon Bedrock](https://img.shields.io/badge/Amazon_Bedrock-Claude-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
+[![AWS Cognito](https://img.shields.io/badge/Auth-Cognito-DD344C?logo=amazoncognito&logoColor=white)](https://aws.amazon.com/cognito/)
+[![AWS DynamoDB](https://img.shields.io/badge/DB-DynamoDB-4053D6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
+[![License](https://img.shields.io/badge/License-MIT-22c55e)](#)
+
+**Author:** Zhiqi Zhang · **Stack:** Next.js + FastAPI + Amazon Bedrock + DynamoDB + Cognito + Adzuna
+
+> One workspace. One orchestrator. Seven specialist agents.
+> 一个工作台、一个总调度、七个专项 Agent，让杂乱的求职过程变成有节奏的流水线。
+
+---
+
+### 🚀 Try the new v2 preview
+
+```
+https://feature-v2-upgrade.d2taej5h07fd9k.amplifyapp.com
+```
+
+</div>
+
+---
+
+## English
+
+### 🌟 What is CareerCat?
+
+CareerCat is an **agentic AI job-search assistant** that turns a messy, multi-step job search into a single account-based workspace. You don't copy-paste between Notion, spreadsheets, LinkedIn tabs, ChatGPT, and an interview prep doc anymore — CareerCat's **Workflow Orchestrator** reads your goal and dispatches the right specialist agent for every step.
 
 ```mermaid
 flowchart LR
-    User["User"] --> Frontend["Next.js Frontend"]
-    Frontend --> Cognito["Amazon Cognito"]
-    Frontend --> Backend["FastAPI Backend"]
-    Backend --> DynamoDB["Amazon DynamoDB"]
-    Backend --> Bedrock["Amazon Bedrock"]
-    Backend --> Adzuna["Adzuna API"]
+    User["👤 User"] --> FE["Next.js Frontend"]
+    FE --> Auth["Amazon Cognito"]
+    FE --> BE["FastAPI Backend"]
+    BE --> DDB["DynamoDB · per-user state"]
+    BE --> BR["Amazon Bedrock · Claude"]
+    BE --> ADZ["Adzuna · live jobs"]
 ```
 
-## Features
+### ✨ What makes it different — the **Agent Harness**
 
-- **Account-based workspaces:** Users can create their own CareerCat account with Amazon Cognito. Resume profiles, saved jobs, statuses, and preferences are stored per user.
-- **Local development mode:** Developers can run the app locally with `AUTH_MODE=local` and browser-generated test users, without needing Cognito during early testing.
-- **Resume/profile setup:** Users can upload a resume, let AI parse profile fields, manually correct extracted details, and save the edited version to their account.
-- **Resume overwrite behavior:** Uploading a new resume for the same user re-parses the resume and updates the saved profile information.
-- **Sponsorship preference:** Users can indicate whether they need visa sponsorship. The app uses this preference when importing and recommending jobs.
-- **AI job post import:** Users can paste a job description. CareerCat parses it into structured fields such as title, company, location, salary, skills, requirements, dates, and sponsorship support.
-- **Sponsorship warning during import:** If a user needs sponsorship and the pasted job appears not to support it, the app warns the user before saving.
-- **Job recommendations:** CareerCat can search Adzuna jobs by role, keyword, location, posting date range, and other user needs, then filter recommendations against the user's sponsorship requirement.
-- **Application dashboard:** Saved jobs are displayed in a board-like dashboard with filters, sorting, application status updates, application dates, posting dates, notes, and job details.
-- **Application status tracking:** Jobs default to `Not Applied` and can be moved through statuses such as applied, assessment, interview, offer, rejected, or other progress states.
-- **Multi-stage workflow agents:** The home page is an LLM-powered planning surface. It turns complex requests into ordered stages, chooses the right specialist agent or tool for each stage, tracks dependencies, and routes the user to the next actionable page.
-- **Smooth fallback behavior:** If the user enters unclear or unrelated text, the workflow agent provides platform guidance and asks for useful details instead of forcing an irrelevant workflow.
-- **AI Career Coach:** The coach supports resume-job gap analysis, technical mock interviews, behavioral mock interviews, and written assessment practice.
-- **Language-aware code rendering:** Coach responses render fenced code blocks with syntax highlighting for common languages such as Python, SQL, JavaScript, TypeScript, JSON, Bash, HTML/XML, CSS, Java, C++, C#, R, Go, Rust, and YAML.
-- **Internal workflow logs:** Backend agent and tool runs can be stored in DynamoDB for debugging, latency inspection, and future product analytics.
+The home page is **not a chatbot** and **not a fixed pipeline**. It is an orchestrator that:
 
-## Set Up Instructions
+1. **Reads intent** from a natural-language request.
+2. **Checks data sufficiency** — does it have your resume? a target job? saved applications?
+3. **Picks one** of seven specialist subagents to handle the next step.
+4. **Plans a 2-5 step todo list** of user-visible platform actions, with `depends_on` ordering.
+5. **Surfaces 2-4 suggested next actions** as routed buttons, so the next click is always one tap away.
+6. **Persists every workflow** in DynamoDB so users can resume on any device.
 
-This repository is a monorepo with a Next.js frontend and a FastAPI backend.
+#### The 7 specialist subagents
 
-### Prerequisites and Dependencies
+| Agent | Owns | Lands you on | Tool |
+| --- | --- | --- | --- |
+| 🧾 **Profile Agent** | Resume parsing, skills, target roles, sponsorship | `/profile` | `go_to_profile` |
+| 🔎 **Job Search Agent** | Fresh discovery on Adzuna with role / location / recency / visa filters | `/recommendations` | `search_adzuna_jobs` |
+| 📥 **Job Parser Agent** | Pasted JD → structured fields (title, company, salary, skills, sponsorship signal) | `/import-jobs` | `parse_job_post` |
+| 🧩 **Fit Agent** | Profile-vs-job gap analysis, tailoring, prioritization | `/coach` | `start_gap_analysis` |
+| 📋 **Tracker Agent** | Saved jobs, application status, dates, notes — Kanban + List | `/dashboard` | `view_dashboard` |
+| 📈 **Insights Agent** | Funnel health, response rates, weekly retrospectives | `/insights` | `view_insights` |
+| 🎓 **Coach Agent** | Technical + behavioral mocks, written assessments, SQL/Python drills | `/coach` | `start_mock_interview` |
 
-Install the following before running the project:
+#### Design principles
 
-- **Git**
-- **Node.js 20+** and npm
-- **Python 3.11+**
-- **AWS CLI** configured with credentials that can access the required AWS services
-- **AWS services for full functionality:**
-  - Amazon Bedrock model access
-  - Amazon DynamoDB tables
-  - Amazon Cognito User Pool for production-style authentication
-  - AWS App Runner or another backend hosting option for deployment
-  - AWS Amplify Hosting or another frontend hosting option for deployment
-- **Adzuna API credentials** for live job recommendations
-- **Docker** if deploying the backend through an image-based workflow
+- **Domain ownership** — each subagent only acts within its domain. A Fit Agent will refuse to answer if either the resume or the job description is missing; it creates a `/profile` or `/import-jobs` todo instead.
+- **Anti-hallucination guardrails** — the orchestrator never invents resume facts, saved jobs, company names, or application statuses. Missing inputs become explicit platform todos.
+- **Routing transparency** — every subagent has a fixed UI route, so the agent always knows *where* to send you, not just *what* to say.
+- **Compact platform todos** — only user-actionable steps surface in the UI. Internal handoffs ("coordinate harness", "understand goal") stay hidden.
+- **Suggested actions, not free chat** — the orchestrator returns vertical-choice buttons that map to real CareerCat routes, eliminating the "what do I do next?" gap.
+- **Stateful workflows** — every conversation is saved with its plan, todos, and completed steps, so users can resume any past workflow from the sidebar.
 
-Important local-development note:
+### 🎯 Feature highlights
 
-`AUTH_MODE=local` only bypasses Cognito authentication. It does not replace Bedrock, DynamoDB, or Adzuna. To test AI parsing, recommendations, saved profile data, saved jobs, coach history, and workflow logs locally, the backend still needs valid AWS credentials and DynamoDB tables.
+| | |
+| --- | --- |
+| 🧠 **Multi-stage Workflow Agent** — One input → a planned, ordered, routed plan. | 🗂️ **Kanban + List Dashboard** — Toggle views, persisted per user. |
+| 📄 **AI Resume Parsing** — Upload → structured profile → editable → saved. | 📌 **One-paste Job Import** — Pasted JD becomes a typed job card with sponsorship signal. |
+| 🌐 **Live Job Recommendations** — Adzuna search with visa-aware filtering. | 📊 **Application Insights** — Funnel, response rate, weekly retrospective. |
+| 🎤 **AI Career Coach** — Gap analysis · mock interview · written assessment. | 💻 **Language-aware Coach Code** — Python · SQL · JS/TS · JSON · Bash · Java · C++ · Go · Rust · YAML and more. |
+| 🛂 **Sponsorship-aware Pipeline** — Warns on jobs that don't support sponsorship. | ☁️ **Cloud Workflow History** — Resume any past workflow from any device. |
+| 🌏 **Bilingual UI (EN / 中文)** — Agent output adapts to user locale. | 🔭 **Internal Observability** — Latency, tool selection, input/output per run. |
 
-### Installation
+---
 
-Clone the repository:
+## 中文
+
+### 🌟 CareerCat 是什么？
+
+CareerCat 是一款 **Agentic AI 求职工作台**。它把投简历、找岗、做对照、追踪进度、模拟面试这些原本散落在 Notion、Excel、LinkedIn、ChatGPT、面经文档里的步骤，**整合到一个账户体系下**。你只需要把目标说清楚，**总调度 Agent（Workflow Orchestrator）** 会自动选最合适的专项 Agent 接手下一步。
+
+```mermaid
+flowchart LR
+    用户["👤 用户"] --> 前端["Next.js 前端"]
+    前端 --> 认证["Amazon Cognito"]
+    前端 --> 后端["FastAPI 后端"]
+    后端 --> 数据库["DynamoDB · 用户数据"]
+    后端 --> 大模型["Amazon Bedrock · Claude"]
+    后端 --> 岗位["Adzuna · 实时岗位"]
+```
+
+### ✨ 核心亮点：Agent Harness 多智能体编排
+
+工作台首页**不是聊天框**、**也不是固定流水线**，而是一个总调度，它会：
+
+1. **识别意图** —— 从你的自然语言请求里抽出真正想做的事
+2. **检查数据是否充分** —— 有没有简历？有没有目标岗位？有没有保存的投递记录？
+3. **选择一个专项 Agent** —— 从 7 个子 Agent 里挑一个最合适的接手
+4. **生成 2–5 步的平台 todo** —— 每一步都带 `depends_on` 依赖顺序
+5. **推 2–4 个建议下一步** —— 渲染成纵向按钮，下一步永远只差一次点击
+6. **持久化整段工作流** —— 写入 DynamoDB，换设备也能续上
+
+#### 7 个专项子 Agent
+
+| Agent | 负责 | 落地页 | 工具 |
+| --- | --- | --- | --- |
+| 🧾 **Profile Agent** | 简历解析、技能、目标岗、签证偏好 | `/profile` | `go_to_profile` |
+| 🔎 **Job Search Agent** | Adzuna 实时岗位发现，按角色/地点/时效/签证过滤 | `/recommendations` | `search_adzuna_jobs` |
+| 📥 **Job Parser Agent** | 粘贴的 JD → 结构化字段（公司、薪资、技能、签证信号） | `/import-jobs` | `parse_job_post` |
+| 🧩 **Fit Agent** | 简历-岗位差距分析、定制化建议、优先级排序 | `/coach` | `start_gap_analysis` |
+| 📋 **Tracker Agent** | 投递管理、状态、日期、备注 —— 看板 + 列表两种视图 | `/dashboard` | `view_dashboard` |
+| 📈 **Insights Agent** | 投递漏斗、回复率、瓶颈、周度复盘 | `/insights` | `view_insights` |
+| 🎓 **Coach Agent** | 技术 + 行为面试、笔试、SQL/Python 训练 | `/coach` | `start_mock_interview` |
+
+#### 设计原则
+
+- **领域专属（Domain Ownership）** —— 子 Agent 只在自己的领域里行动。Fit Agent 如果发现简历或 JD 缺失，**不会瞎猜**，而是创建一个 `/profile` 或 `/import-jobs` 平台 todo，让用户先补齐。
+- **反幻觉护栏（Anti-hallucination Guardrails）** —— 总调度从不编造简历事实、岗位信息或投递状态；缺什么就明确建一个平台 todo 让用户补。
+- **路由透明（Routing Transparency）** —— 每个子 Agent 都有固定 UI 路由，Agent 永远知道**把用户带到哪个页面**，而不是只会说话。
+- **平台 Todo 简洁化** —— UI 上只暴露**用户需要做的动作**，内部交接（"理解目标"、"协调 harness"）全部隐藏。
+- **建议动作而非自由对话** —— Agent 返回带路由的纵向按钮，彻底消灭"下一步该干嘛"的卡顿。
+- **有状态工作流** —— 每段对话连同计划、todo、完成步骤一起保存，侧边栏点一下就能继续上次的流程。
+
+### 🎯 功能矩阵
+
+| | |
+| --- | --- |
+| 🧠 **多阶段工作流 Agent** —— 一句话 → 一份带依赖关系的可执行计划。 | 🗂️ **Kanban + 列表 Dashboard** —— 视图切换 + 用户级偏好持久化。 |
+| 📄 **AI 简历解析** —— 上传 → 结构化字段 → 可编辑 → 一键保存。 | 📌 **粘贴即导入岗位** —— JD 粘贴自动转结构化卡片，附带签证信号。 |
+| 🌐 **实时岗位推荐** —— Adzuna 搜索 + 签证感知过滤。 | 📊 **投递进度 Insights** —— 漏斗、回复率、瓶颈识别、周度复盘。 |
+| 🎤 **AI 求职教练** —— 差距分析 · 模拟面试 · 笔试训练。 | 💻 **语言感知代码渲染** —— Python · SQL · JS/TS · JSON · Bash · Java · C++ · Go · Rust · YAML 等。 |
+| 🛂 **签证敏感流程** —— 遇到不 sponsor 的岗位主动提醒。 | ☁️ **云端工作流历史** —— 跨设备续上任何一段工作流。 |
+| 🌏 **中英双语 UI** —— Agent 输出按用户 locale 自适应。 | 🔭 **内部可观测性** —— 每次工具调用的延迟、入参、出参全部留痕。 |
+
+---
+
+## 🏗️ Architecture Overview · 架构总览
+
+```mermaid
+flowchart TB
+    subgraph FE["Next.js Frontend"]
+      W["🏠 Workspace<br/>(Orchestrator UI)"]
+      P["🧾 Profile"]
+      I["📥 Import"]
+      R["🔎 Recommendations"]
+      D["📋 Dashboard"]
+      IN["📈 Insights"]
+      C["🎓 Coach"]
+    end
+
+    subgraph BE["FastAPI Backend"]
+      AGT["agent_assist_service"]
+      REG["workflow_agent_registry"]
+      WHIST["workflow history"]
+      TOOLS["tools: parse, search, gap, mock..."]
+    end
+
+    subgraph AWS["AWS"]
+      BR["Bedrock · Claude"]
+      DDB["DynamoDB"]
+      COG["Cognito"]
+    end
+
+    W --> AGT
+    P --> AGT
+    I --> AGT
+    R --> AGT
+    D --> AGT
+    IN --> AGT
+    C --> AGT
+
+    AGT --> REG
+    AGT --> TOOLS
+    AGT --> WHIST
+
+    REG --> BR
+    TOOLS --> BR
+    WHIST --> DDB
+    AGT --> COG
+    TOOLS --> AD["Adzuna API"]
+```
+
+---
+
+## 🚀 Quick Start · 快速开始
+
+> Tested with Node.js 20+ and Python 3.11+.
 
 ```bash
+# 1. clone
 git clone https://github.com/zhiqi-zhang233/CareerCat.git
 cd CareerCat
-```
 
-Install backend dependencies:
-
-```bash
+# 2. backend
 cd careercat-backend
-python -m venv venv
-source venv/bin/activate
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-```
+cp .env.example .env          # fill in AWS creds, Adzuna creds
+uvicorn app.main:app --reload --port 8000
 
-Install frontend dependencies:
-
-```bash
+# 3. frontend (new terminal)
 cd ../careercat-frontend
 npm install
-cp .env.example .env.local
+cp .env.example .env.local    # point NEXT_PUBLIC_API_BASE_URL at the backend
+npm run dev
+# open http://localhost:3000
 ```
 
-### Environment Variables
+**Local-only mode** — set `AUTH_MODE=local` in the backend `.env` to skip Cognito and use a browser-generated test user id. Bedrock, DynamoDB, and Adzuna are still required for AI parsing, recommendations, and persistence.
 
-Never commit real `.env` or `.env.local` files. The repository includes example files that list the required variable names.
+---
 
-#### Backend: `careercat-backend/.env`
+## ⚙️ Environment Variables · 环境变量
+
+### Backend (`careercat-backend/.env`)
 
 ```env
 AWS_REGION=us-east-2
 BEDROCK_REGION=us-east-2
 BEDROCK_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
-
 DYNAMODB_USER_PROFILES_TABLE=UserProfiles
 DYNAMODB_JOB_POSTS_TABLE=JobPosts
 DYNAMODB_AGENT_RUNS_TABLE=AgentRuns
 DYNAMODB_COACH_SESSIONS_TABLE=CoachSessions
-
-ADZUNA_APP_ID=your-adzuna-app-id
-ADZUNA_APP_KEY=your-adzuna-app-key
+DYNAMODB_WORKFLOW_HISTORY_TABLE=WorkflowHistory     # v2
+ADZUNA_APP_ID=...
+ADZUNA_APP_KEY=...
 ADZUNA_COUNTRY=us
-
-# local or cognito
-AUTH_MODE=local
-COGNITO_REGION=us-east-2
-COGNITO_USER_POOL_ID=your-cognito-user-pool-id
-COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
-
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-```
-
-#### Frontend: `careercat-frontend/.env.local`
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-
-# local or cognito
-NEXT_PUBLIC_AUTH_MODE=local
-NEXT_PUBLIC_COGNITO_REGION=us-east-2
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=your-cognito-user-pool-id
-NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
-```
-
-#### Local Mode
-
-Use local mode for fast local testing:
-
-Backend:
-
-```env
-AUTH_MODE=local
-```
-
-Frontend:
-
-```env
-NEXT_PUBLIC_AUTH_MODE=local
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-```
-
-In this mode, the frontend creates a local browser user id and sends it with requests. This is useful for development, but it is not suitable as the public account system.
-
-#### Cognito Mode
-
-Use Cognito mode for the deployed app:
-
-Backend:
-
-```env
 AUTH_MODE=cognito
 COGNITO_REGION=us-east-2
-COGNITO_USER_POOL_ID=your-cognito-user-pool-id
-COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
+COGNITO_USER_POOL_ID=...
+COGNITO_APP_CLIENT_ID=...
+CORS_ALLOWED_ORIGINS=https://main.d2taej5h07fd9k.amplifyapp.com,https://feature-v2-upgrade.d2taej5h07fd9k.amplifyapp.com,http://localhost:3000
 ```
 
-Frontend:
-
-```env
-NEXT_PUBLIC_AUTH_MODE=cognito
-NEXT_PUBLIC_COGNITO_REGION=us-east-2
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=your-cognito-user-pool-id
-NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
-```
-
-In Cognito mode, the frontend sends a Cognito ID token with API requests. The backend verifies the token and uses the Cognito user `sub` as the user's internal `user_id`.
-
-### Running Locally
-
-Start the backend:
-
-```bash
-cd careercat-backend
-source venv/bin/activate
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-Check the backend health endpoint:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-Start the frontend in another terminal:
-
-```bash
-cd careercat-frontend
-npm run dev
-```
-
-Open the app:
-
-```text
-http://localhost:3000
-```
-
-### DynamoDB Tables
-
-CareerCat expects four DynamoDB tables:
-
-```text
-UserProfiles
-JobPosts
-AgentRuns
-CoachSessions
-```
-
-The code reads the exact names from environment variables, so the table names can be changed as long as the environment variables are updated. The current implementation stores user profile records, saved job records, internal agent workflow logs, and cross-device coach chat history in DynamoDB.
-
-### Useful Developer Commands
-
-Frontend:
-
-```bash
-cd careercat-frontend
-npm run lint
-npm run build
-```
-
-Backend:
-
-```bash
-cd careercat-backend
-source venv/bin/activate
-uvicorn app.main:app --reload
-```
-
-Docker backend image build:
-
-```bash
-cd careercat-backend
-docker build -t careercat-backend .
-```
-
-## Usage
-
-CareerCat is primarily used through the web interface.
-
-### 1. Start With Workflow Agents
-
-Open the home page. The workflow agent asks what the user wants to accomplish and turns that goal into a staged plan. Starter goals fill the text box first so the user can edit details before asking the agent.
-
-Example requests:
-
-```text
-I want to create a new profile, upload my resume, and find data analyst jobs that match it.
-```
-
-```text
-I want to import a job description, check sponsorship fit, and save it if it matches my goals.
-```
-
-```text
-Find fresh data analyst jobs in Chicago posted this week, then help me prioritize which ones to apply to.
-```
-
-```text
-Review my saved jobs, show my current application status, and help me choose the next follow-up.
-```
-
-```text
-Train me for a written assessment on Python and SQL for data roles.
-```
-
-The LLM planner identifies the user's goal, chooses the relevant specialist agent, builds an ordered sequence of stages, marks blocked steps that need user input, and routes the user to the current actionable page. If the message is vague or unrelated, it gives guidance instead of forcing a route.
-
-### 2. Build a Profile
-
-Go to **Profile Setup** and upload a resume. CareerCat parses the resume into editable profile fields. Users can correct parsed information and save those edits to their account. If the same user uploads a new resume later, the new parsed result updates the profile.
-
-Users can also set whether they need visa sponsorship. That preference affects job import warnings and recommendation filtering.
-
-### 3. Import a Job Description
-
-Go to **Import Jobs** and paste a job post. CareerCat uses AI to extract structured job information, including title, company, location, skills, requirements, compensation, dates, and sponsorship signal.
-
-If the user needs sponsorship and the job appears not to support sponsorship, CareerCat warns the user and asks whether they still want to save it.
-
-### 4. Get Job Recommendations
-
-Go to **Job Recommendations** or ask the workflow agent for fresh jobs. CareerCat uses Adzuna as a job source and can search by keyword, role, location, posting window, and result count. The recommendation workflow avoids recommending jobs that conflict with the user's sponsorship requirement when sponsorship information is detectable.
-
-### 5. Track Applications
-
-Go to **Dashboard** to view saved jobs. Users can filter and sort by fields such as job title, location, salary, posting date, application date, skills, and application status. Saved jobs default to `Not Applied`, and users can update each job as they move through the application process.
-
-### 6. Practice With AI Career Coach
-
-Go to **Coach** to start a coaching session. CareerCat supports three coaching modes:
-
-- **Resume and Job Gap:** Select a saved job from the dashboard. The coach explains how the user's resume could be improved for that role and what skills are missing.
-- **Mock Interview:** Choose technical or behavioral interview practice. The coach asks one question at a time, scores the answer, and continues when the user is ready.
-- **Written Assessment:** Enter a topic such as statistics, SQL, Python, algorithms, or data analysis. The coach explains concepts, gives practice problems, and can show code with language-aware syntax highlighting.
-
-### Example API Check
-
-Backend health check:
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-Expected response:
-
-```json
-{
-  "status": "ok"
-}
-```
-
-## Tech Stack
-
-### Languages
-
-- TypeScript
-- Python
-- CSS
-- JSON
-- Shell scripts / CLI commands
-
-### Frameworks and Libraries
-
-- Next.js 16
-- React 19
-- Tailwind CSS 4
-- FastAPI
-- Pydantic
-- Uvicorn
-- Boto3
-- PyJWT
-- Amazon Cognito Identity JS
-- highlight.js for coach code block rendering
-
-### Tools, Services, and APIs
-
-- Amazon Bedrock for LLM-powered parsing, routing, recommendations, and coaching
-- Amazon DynamoDB for user data, coach sessions, and internal workflow logs
-- Amazon Cognito for production account authentication
-- AWS App Runner for backend deployment
-- AWS Amplify Hosting for frontend deployment
-- Amazon ECR for backend container images when using image deployment
-- Adzuna API for job search data
-- Docker for backend containerization
-- GitHub for source control and Amplify deployment integration
-
-## Project Structure
-
-```text
-CareerCat/
-+-- README.md
-+-- careercat-backend/
-|   +-- Dockerfile
-|   +-- apprunner.yaml
-|   +-- requirements.txt
-|   +-- .env.example
-|   +-- app/
-|       +-- main.py
-|       +-- config.py
-|       +-- auth.py
-|       +-- routers/
-|       |   +-- agent.py
-|       |   +-- analysis.py
-|       |   +-- coach.py
-|       |   +-- job_discovery.py
-|       |   +-- jobs.py
-|       |   +-- profile.py
-|       |   +-- recommend.py
-|       +-- schemas/
-|       |   +-- agent.py
-|       |   +-- coach.py
-|       |   +-- job_discovery.py
-|       |   +-- jobs.py
-|       |   +-- profile.py
-|       +-- services/
-|           +-- adzuna_service.py
-|           +-- agent_assist_service.py
-|           +-- bedrock_service.py
-|           +-- dynamodb_service.py
-|           +-- fit_analysis_service.py
-|           +-- interview_coach_service.py
-|           +-- job_discovery_service.py
-|           +-- job_parser_service.py
-|           +-- observability_service.py
-|           +-- recommend_service.py
-|           +-- resume_file_service.py
-|           +-- resume_parser_service.py
-|           +-- sponsorship_filter_service.py
-+-- careercat-frontend/
-    +-- amplify.yml
-    +-- package.json
-    +-- package-lock.json
-    +-- tsconfig.json
-    +-- .env.example
-    +-- app/
-    |   +-- page.tsx
-    |   +-- layout.tsx
-    |   +-- globals.css
-    |   +-- profile/page.tsx
-    |   +-- import-jobs/page.tsx
-    |   +-- recommendations/page.tsx
-    |   +-- dashboard/page.tsx
-    |   +-- coach/page.tsx
-    +-- components/
-    |   +-- AuthGate.tsx
-    |   +-- Header.tsx
-    +-- lib/
-    |   +-- api.ts
-    |   +-- AuthContext.tsx
-    |   +-- authConfig.ts
-    |   +-- authToken.ts
-    |   +-- session.ts
-    |   +-- types.ts
-    |   +-- useLocalUserId.ts
-    +-- public/
-        +-- logo.svg
-```
-
-### Important Backend Areas
-
-- `app/main.py`: FastAPI app setup, CORS, and router registration.
-- `app/auth.py`: Local mode and Cognito token verification.
-- `app/routers/`: API route definitions by feature area.
-- `app/schemas/`: Pydantic request and response models.
-- `app/services/bedrock_service.py`: Bedrock LLM calls and structured parsing helpers.
-- `app/services/agent_assist_service.py`: Multi-stage workflow planning, routing, and tool-selection logic.
-- `app/services/dynamodb_service.py`: DynamoDB persistence for profiles, jobs, coach sessions, and internal workflow logs.
-- `app/services/sponsorship_filter_service.py`: Sponsorship signal inference and filtering helpers.
-
-### Important Frontend Areas
-
-- `app/page.tsx`: Multi-stage workflow agent homepage.
-- `app/profile/page.tsx`: Resume upload and editable profile setup.
-- `app/import-jobs/page.tsx`: Job description import and sponsorship warning workflow.
-- `app/recommendations/page.tsx`: Adzuna-backed job discovery UI.
-- `app/dashboard/page.tsx`: Saved job board with status tracking, filtering, and sorting.
-- `app/coach/page.tsx`: AI Career Coach sessions and code-aware Markdown rendering.
-- `components/AuthGate.tsx`: Switches between local auth and Cognito auth.
-- `lib/api.ts`: Frontend API client.
-
-## Deployment Notes
-
-The deployed product version uses AWS:
-
-- **Frontend:** AWS Amplify Hosting
-- **Backend:** AWS App Runner
-- **Authentication:** Amazon Cognito
-- **Database:** Amazon DynamoDB
-- **LLM:** Amazon Bedrock
-- **Job data:** Adzuna API
-- **Container registry:** Amazon ECR, if using image-based backend deployment
-
-### Current Public Frontend URL
-
-```text
-https://main.d2taej5h07fd9k.amplifyapp.com/
-```
-
-### Current Backend URL
-
-```text
-https://rpgqpmg46v.us-east-2.awsapprunner.com
-```
-
-These URLs may change if the AWS services are recreated.
-
-The submitted AWS backend reads `BEDROCK_MODEL_ID` from environment variables. The current deployment uses `nvidia.nemotron-nano-12b-v2`; local or reproduced deployments can use another Bedrock chat model if the prompt/response format is compatible.
-
-### Frontend Deployment With AWS Amplify
-
-The frontend is deployed from the `careercat-frontend` monorepo root. The repository includes:
-
-```text
-careercat-frontend/amplify.yml
-```
-
-Amplify build settings:
-
-```yaml
-version: 1
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - npm ci
-    build:
-      commands:
-        - npm run build
-  artifacts:
-    baseDirectory: .next
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - node_modules/**/*
-```
-
-Required Amplify environment variables:
+### Frontend (`careercat-frontend/.env.local`)
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://your-backend-url
 NEXT_PUBLIC_AUTH_MODE=cognito
 NEXT_PUBLIC_COGNITO_REGION=us-east-2
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=your-cognito-user-pool-id
-NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=...
+NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=...
 ```
 
-### Backend Deployment With AWS App Runner
+---
 
-The backend can be deployed with App Runner using `careercat-backend/Dockerfile` or `careercat-backend/apprunner.yaml`.
+## ☁️ Deployment · 部署
 
-Required App Runner environment variables:
+CareerCat is designed to run on AWS:
 
-```env
-AWS_REGION=us-east-2
-BEDROCK_REGION=us-east-2
-BEDROCK_MODEL_ID=your-bedrock-model-id
-DYNAMODB_USER_PROFILES_TABLE=UserProfiles
-DYNAMODB_JOB_POSTS_TABLE=JobPosts
-DYNAMODB_AGENT_RUNS_TABLE=AgentRuns
-DYNAMODB_COACH_SESSIONS_TABLE=CoachSessions
-ADZUNA_APP_ID=your-adzuna-app-id
-ADZUNA_APP_KEY=your-adzuna-app-key
-ADZUNA_COUNTRY=us
-AUTH_MODE=cognito
-COGNITO_REGION=us-east-2
-COGNITO_USER_POOL_ID=your-cognito-user-pool-id
-COGNITO_APP_CLIENT_ID=your-cognito-app-client-id
-CORS_ALLOWED_ORIGINS=https://your-amplify-url,http://localhost:3000
+| Layer | Service |
+| --- | --- |
+| Frontend | **AWS Amplify Hosting** (one app, multiple branches → multiple URLs) |
+| Backend | **AWS App Runner** (Docker image from ECR) |
+| Auth | **Amazon Cognito** User Pool + App Client |
+| Database | **Amazon DynamoDB** (UserProfiles, JobPosts, AgentRuns, CoachSessions, WorkflowHistory) |
+| LLM | **Amazon Bedrock** (Claude family) |
+| Jobs | **Adzuna API** |
+| Registry | **Amazon ECR** (if image-based backend) |
+
+### Live URLs
+
+| Branch | URL |
+| --- | --- |
+| `main` (production) | https://main.d2taej5h07fd9k.amplifyapp.com |
+| `feature/v2-upgrade` (v2 preview) | https://feature-v2-upgrade.d2taej5h07fd9k.amplifyapp.com |
+
+### Frontend on Amplify
+
+The repository root `amplify.yml` already targets `careercat-frontend` as the app root and outputs `.next`. To preview a new branch:
+
+1. Amplify Console → **Connect a branch** → pick the branch
+2. Copy the same env vars from `main`, overriding `NEXT_PUBLIC_API_BASE_URL` if pointing at a separate backend
+3. **Save and deploy** → Amplify will give you a per-branch URL
+
+### Backend on App Runner
+
+`careercat-backend/` ships with both a `Dockerfile` and an `apprunner.yaml`. Either build to ECR and deploy from there, or use App Runner's source-based deploy with the YAML.
+
+The runtime role needs:
+
+- `bedrock:InvokeModel` / `InvokeModelWithResponseStream`
+- DynamoDB `GetItem / PutItem / UpdateItem / Query / DeleteItem` on the configured tables
+- ECR pull permission if image-based
+
+### Cognito Tips
+
+- Use a **public app client** without a secret for browser-based login
+- For development, **Gmail addresses** receive Cognito verification codes most reliably
+- Set `NEXT_PUBLIC_AUTH_MODE=cognito` and `AUTH_MODE=cognito` once production-style auth is in place
+
+---
+
+## 📁 Repository Structure · 仓库结构
+
+```text
+CareerCat/
+├── amplify.yml                         # monorepo build spec (frontend root)
+├── README.md                           # this file
+├── docs/
+│   ├── careercat-architecture-and-implementation.md   # full engineering handoff doc
+│   └── index.html
+├── careercat-backend/                  # FastAPI + Bedrock + DynamoDB
+│   ├── app/
+│   │   ├── main.py                     # routers + CORS
+│   │   ├── auth.py                     # local mode + Cognito JWT verification
+│   │   ├── routers/                    # /agent /workflows /coach /jobs /profile ...
+│   │   ├── schemas/                    # Pydantic models
+│   │   └── services/
+│   │       ├── agent_assist_service.py        # 🧠 orchestrator + multi-stage planning
+│   │       ├── workflow_agent_registry.py     # 🧩 7 specialist subagents + prompts
+│   │       ├── bedrock_service.py             # Bedrock client + structured parsing
+│   │       ├── dynamodb_service.py            # per-user persistence + workflow history
+│   │       ├── adzuna_service.py              # external job source
+│   │       └── ... (job_parser, fit_analysis, interview_coach, ...)
+│   ├── Dockerfile
+│   └── apprunner.yaml
+└── careercat-frontend/                 # Next.js 16, App Router, Tailwind v4
+    ├── amplify.yml
+    ├── app/
+    │   ├── (app)/workspace/page.tsx    # 🏠 orchestrator UI (chat-style + plan + todos)
+    │   ├── (app)/profile/page.tsx
+    │   ├── (app)/import-jobs/page.tsx
+    │   ├── (app)/recommendations/page.tsx
+    │   ├── (app)/dashboard/page.tsx    # list + Kanban view
+    │   ├── (app)/insights/page.tsx
+    │   └── (app)/coach/page.tsx
+    ├── components/
+    │   ├── AppShell.tsx                # sidebar with workflow history rail
+    │   ├── kanban/                     # KanbanBoard / Column / Card / JobDetailModal
+    │   └── PaintingCanvas.tsx
+    └── lib/
+        ├── api.ts                      # typed API client
+        ├── types.ts                    # WorkflowChatMessage / HistoryEntry / SuggestedAction
+        └── i18n/                       # zh + en dictionaries
 ```
 
-### AWS Permissions Needed by the Backend
+---
 
-The backend runtime role needs permission to:
+## 🗺️ Roadmap
 
-- Read and write the configured DynamoDB tables.
-- Call the selected Amazon Bedrock model.
-- Read required AWS region/account metadata.
+- **Streaming agent output** — replace request-response with token streaming for snappier UX
+- **Multi-agent debate for hard gap analysis** — Fit Agent + Coach Agent cross-check before recommending
+- **Calendar-aware interview scheduling**
+- **Self-hosted job-board adapters** beyond Adzuna
+- **Mobile-first responsive Workspace**
+- **Personalized weekly retrospective email** powered by Insights Agent
 
-If deploying from ECR, App Runner also needs an access role that can pull the backend image from ECR.
+---
 
-### Cognito Notes
+## 🙋‍♀️ Author · 作者
 
-For production-style deployment:
+**Zhiqi Zhang** — built CareerCat to scratch the personal itch of running a job search across 8 different tools.
 
-1. Create a Cognito User Pool.
-2. Create an App Client without a client secret for browser-based login.
-3. Put the User Pool ID and App Client ID into both frontend and backend environment variables.
-4. Set `AUTH_MODE=cognito` in the backend.
-5. Set `NEXT_PUBLIC_AUTH_MODE=cognito` in the frontend.
+**Feedback?** Open an issue, or send a message via the in-app feedback button on the v2 preview site.
 
-During testing, Gmail/Google email addresses have received Cognito verification codes more reliably and quickly than some school or organization email domains. If a new user does not receive a code, try registering with a Gmail address first.
+> *Designed end-to-end on AWS. Powered by Claude on Bedrock. Built with love for everyone in the middle of a job search.*
 
-### Internal Workflow Logs
+---
 
-CareerCat can record workflow traces in the `AgentRuns` DynamoDB table. Coach conversations are stored separately in the `CoachSessions` table so history follows the user's account across browsers and devices. The workflow logs capture selected agents/tools, success or failure status, latency, input summaries, output summaries, and errors. They are intended for backend debugging and future product analytics rather than as a public end-user feature.
+<div align="center">
 
-### Why This System Is Agentic
+**[Production →](https://main.d2taej5h07fd9k.amplifyapp.com) · [Try v2 preview →](https://feature-v2-upgrade.d2taej5h07fd9k.amplifyapp.com) · [Architecture doc →](docs/careercat-architecture-and-implementation.md)**
 
-CareerCat includes deterministic UI workflows, but its key agentic component is the multi-stage workflow planner on the home page. Given a user's natural-language request, the LLM decides whether to:
-
-- Route to profile setup.
-- Trigger job recommendation workflow.
-- Route to job post import.
-- Open the application dashboard.
-- Start resume-job gap analysis.
-- Start a mock interview.
-- Start written assessment training.
-- Ask a follow-up question.
-- Stay on the home page and provide guidance for unclear input.
-
-The LLM also produces an ordered plan with stage dependencies, current ready step, required user inputs, and expected outputs. The same input box can therefore lead to different tools, pages, arguments, next steps, and staged plans. That dynamic planning, routing, and tool selection is what makes the system meaningfully agentic rather than a fixed pipeline.
-
-### Reproducing or Extending the Project
-
-To reproduce the project:
-
-1. Fork or clone the repository.
-2. Create the required AWS resources: DynamoDB tables, Bedrock model access, Cognito User Pool, and optional App Runner/Amplify services.
-3. Create Adzuna API credentials.
-4. Fill in backend and frontend environment variables.
-5. Run the backend and frontend locally first.
-6. Deploy the backend and confirm `/health` works.
-7. Deploy the frontend and set `NEXT_PUBLIC_API_BASE_URL` to the backend URL.
-8. Confirm CORS allows the deployed frontend URL.
-9. Create a test account or use local mode for development.
-10. Test the main workflows: profile setup, job import, recommendations, dashboard status updates, coach sessions, and the homepage workflow planner.
-
-Common extension points:
-
-- Add more job data providers in `careercat-backend/app/services/`.
-- Add more coach modes in `interview_coach_service.py` and `app/coach/page.tsx`.
-- Add richer workflow analytics in `observability_service.py` or your own reporting layer.
-- Add more structured job fields in `schemas/jobs.py`, `job_parser_service.py`, and the dashboard UI.
+</div>
