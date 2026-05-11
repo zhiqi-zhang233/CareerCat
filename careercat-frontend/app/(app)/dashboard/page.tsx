@@ -7,6 +7,17 @@ import { deleteJobPost, fetchUserJobs, updateJobPost } from "@/lib/api";
 import type { JobApplicationStatus, JobPost, JobUpdatePayload } from "@/lib/types";
 import { useLocalUserId } from "@/lib/useLocalUserId";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
+import KanbanBoard from "@/components/kanban/KanbanBoard";
+
+type ViewMode = "list" | "board";
+
+function readViewMode(): ViewMode {
+  if (typeof window === "undefined") return "list";
+  return (localStorage.getItem("cc-dashboard-view") as ViewMode) || "list";
+}
+function saveViewMode(m: ViewMode) {
+  localStorage.setItem("cc-dashboard-view", m);
+}
 
 const STATUS_TONE: Record<JobApplicationStatus, string> = {
   not_applied:
@@ -68,6 +79,17 @@ export default function DashboardPage() {
   const [salaryFilter, setSalaryFilter] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+
+  // Hydrate view preference from localStorage after mount
+  useEffect(() => {
+    setViewMode(readViewMode());
+  }, []);
+
+  const switchView = (mode: ViewMode) => {
+    setViewMode(mode);
+    saveViewMode(mode);
+  };
 
   const loadJobs = useCallback(async () => {
     if (!userId) return;
@@ -282,6 +304,32 @@ export default function DashboardPage() {
     }
   };
 
+  // Kanban-specific save: receives a full payload from the modal
+  const handleKanbanSave = async (jobId: string, payload: JobUpdatePayload) => {
+    if (!userId) return;
+    try {
+      setBusyJobId(jobId);
+      setError("");
+      const data = await updateJobPost(userId, jobId, payload);
+      const normalized = normalizeJob(data.job);
+      setJobs((currentJobs) =>
+        currentJobs.map((j) => (j.job_id === jobId ? normalized : j))
+      );
+    } catch (err) {
+      console.error(err);
+      setError(t("app.dashboard.errSaveEdits"));
+    } finally {
+      setBusyJobId("");
+    }
+  };
+
+  // Kanban status drag-drop: wraps handleQuickUpdate
+  const handleKanbanStatusChange = (jobId: string, newStatus: JobApplicationStatus) => {
+    const job = jobs.find((j) => j.job_id === jobId);
+    if (!job) return;
+    handleQuickUpdate(job, { status: newStatus });
+  };
+
   const handleDeleteJob = async (job: JobPost) => {
     if (!userId) return;
     const confirmed = window.confirm(
@@ -329,7 +377,44 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* View toggle */}
+            <div className="flex items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => switchView("list")}
+                aria-pressed={viewMode === "list"}
+                title="列表视图"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                  viewMode === "list"
+                    ? "bg-[var(--color-accent)] text-[var(--color-accent-text)] shadow-sm"
+                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elev-2)]"
+                }`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                </svg>
+                列表
+              </button>
+              <button
+                type="button"
+                onClick={() => switchView("board")}
+                aria-pressed={viewMode === "board"}
+                title="看板视图"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                  viewMode === "board"
+                    ? "bg-[var(--color-accent)] text-[var(--color-accent-text)] shadow-sm"
+                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elev-2)]"
+                }`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <path d="M9 4v16M15 4v16" />
+                </svg>
+                看板
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={loadJobs}
@@ -493,7 +578,32 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {filteredJobs.length === 0 ? (
+        {/* ── Kanban board view ── */}
+        {viewMode === "board" && (
+          <>
+            {filteredJobs.length === 0 ? (
+              <section className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-10 text-center">
+                <h2 className="text-xl font-semibold text-[var(--color-text-accent)]">
+                  {t("app.dashboard.emptyTitle")}
+                </h2>
+                <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[var(--color-text-secondary)]">
+                  {t("app.dashboard.emptyBody")}
+                </p>
+              </section>
+            ) : (
+              <KanbanBoard
+                jobs={filteredJobs}
+                busyJobId={busyJobId}
+                onStatusChange={handleKanbanStatusChange}
+                onSave={handleKanbanSave}
+                onDelete={handleDeleteJob}
+              />
+            )}
+          </>
+        )}
+
+        {/* ── List view ── */}
+        {viewMode === "list" && filteredJobs.length === 0 ? (
           <section className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] p-10 text-center">
             <h2 className="text-xl font-semibold text-[var(--color-text-accent)]">
               {t("app.dashboard.emptyTitle")}
@@ -502,9 +612,9 @@ export default function DashboardPage() {
               {t("app.dashboard.emptyBody")}
             </p>
           </section>
-        ) : (
+        ) : viewMode === "list" ? (
           <section className="mt-8 grid gap-5">
-            {filteredJobs.map((job) => {
+            {viewMode === "list" && filteredJobs.map((job) => {
               const isEditing = editingJobId === job.job_id;
               const viewJob = isEditing ? drafts[job.job_id] || job : job;
 
@@ -903,7 +1013,7 @@ export default function DashboardPage() {
               );
             })}
           </section>
-        )}
+        ) : null}
       </section>
     </main>
   );
