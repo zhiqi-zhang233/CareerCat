@@ -166,16 +166,19 @@
   --color-info-text:     var(--color-info-600);
 }
 
-/* App shell theme: blue accent on a near-white base. The marketing
-   pages stay honey/amber so the surfaces remain visually distinct. */
+/* App shell theme: blue accent on a cream textured base. Glass surface tokens
+   (--card-*) are used by components that sit above the background layer. */
 [data-theme="app"] {
-  --color-bg:          var(--neutral-50);
-  --color-bg-elev-1:   #ffffff;
-  --color-bg-elev-2:   #f4f6fb;
+  /* Base background — cream fallback visible before the texture layer paints */
+  --color-bg:          #fdfbf6;
+  /* Glass surface elevations */
+  --color-bg-elev-1:   rgba(255, 255, 255, 0.78);
+  --color-bg-elev-2:   rgba(255, 255, 255, 0.92);
   --color-bg-inverse:  var(--brand-blue-700);
 
-  --color-border:        var(--neutral-200);
-  --color-border-strong: var(--neutral-300);
+  /* Borders legible against the cream/painting background */
+  --color-border:        rgba(1, 26, 85, 0.08);
+  --color-border-strong: rgba(1, 26, 85, 0.16);
 
   --color-text-primary:   var(--neutral-900);
   --color-text-secondary: var(--neutral-700);
@@ -191,6 +194,19 @@
   --color-warning-text:  var(--color-warning-600);
   --color-danger-text:   var(--color-danger-600);
   --color-info-text:     var(--color-info-600);
+
+  /* ── Glass card tokens ──────────────────────────────────────────────────
+     Use these on panels / cards that float above the textured background so
+     they read as translucent glass rather than opaque boxes.              */
+  --card-bg:            rgba(255, 255, 255, 0.78);
+  --card-bg-strong:     rgba(255, 255, 255, 0.92);
+  --card-border:        rgba(255, 255, 255, 0.65);
+  --card-border-strong: rgba(1, 26, 85, 0.10);
+  --shadow-card:
+    0 1px 0 rgba(255, 255, 255, 0.60) inset,
+    0 12px 32px -16px rgba(1, 26, 85, 0.22),
+    0 2px 8px -2px rgba(1, 26, 85, 0.10);
+  --backdrop-glass: blur(14px) saturate(140%);
 }
 
 @theme inline {
@@ -246,14 +262,20 @@ body {
 
 .cc-card {
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elev-1);
+  border: 1px solid var(--card-border, var(--color-border));
+  background: var(--card-bg, var(--color-bg-elev-1));
+  box-shadow: var(--shadow-card, none);
+  -webkit-backdrop-filter: var(--backdrop-glass, none);
+          backdrop-filter: var(--backdrop-glass, none);
 }
 
 .cc-card-strong {
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg-elev-2);
+  border: 1px solid var(--card-border-strong, var(--color-border-strong));
+  background: var(--card-bg-strong, var(--color-bg-elev-2));
+  box-shadow: var(--shadow-card, none);
+  -webkit-backdrop-filter: var(--backdrop-glass, none);
+          backdrop-filter: var(--backdrop-glass, none);
 }
 
 .cc-btn {
@@ -392,6 +414,57 @@ body {
 }
 @keyframes cc-shimmer {
   to { background-position: 200% center; }
+}
+
+.cc-textured-bg {
+  --cc-textured-bg-opacity: 1;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--cc-textured-bg-opacity);
+  background-color: #f7f3ea;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(1, 26, 85, 0.035) 1px, transparent 0),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.36) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(1, 26, 85, 0.024) 1px, transparent 1px),
+    repeating-linear-gradient(
+      118deg,
+      rgba(1, 26, 85, 0.018) 0,
+      rgba(1, 26, 85, 0.018) 1px,
+      transparent 1px,
+      transparent 11px
+    );
+  background-size:
+    4px 4px,
+    56px 56px,
+    56px 56px,
+    28px 28px;
+  background-position:
+    0 0,
+    -1px -1px,
+    -1px -1px,
+    0 0;
+}
+
+.cc-textured-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.42), transparent 34%),
+    radial-gradient(circle at 86% 12%, rgba(219, 234, 254, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 88%, rgba(255, 195, 88, 0.10), transparent 34%);
+}
+
+.cc-textured-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.012 0 0 0 0 0.102 0 0 0 0 0.333 0 0 0 0.16 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.34'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: multiply;
+  opacity: 0.32;
 }
 
 /* Coach code highlighting (preserved from previous theme) */

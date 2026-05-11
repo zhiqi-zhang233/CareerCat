@@ -211,6 +211,24 @@ export type AgentAssistResponse = {
   workflow_goal: string;
   current_stage_id: string;
   stages: WorkflowStage[];
+  suggested_actions?: WorkflowSuggestedAction[];
+  harness?: {
+    mode?: string;
+    coordinator?: string;
+    selected_handoff?: string;
+    next_route?: string;
+    agents?: string[];
+    todo_count?: number;
+    ready_count?: number;
+    blocked_count?: number;
+  };
+};
+
+export type WorkflowSuggestedAction = {
+  id: string;
+  label: string;
+  route: string;
+  reason?: string;
 };
 
 export type WorkflowStage = {
@@ -223,4 +241,22 @@ export type WorkflowStage = {
   status: "ready" | "blocked" | "planned" | "complete";
   needs_user_input: boolean;
   output: string;
+};
+
+export type WorkflowChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  plan?: AgentAssistResponse;
+};
+
+export type WorkflowHistoryEntry = {
+  user_id: string;
+  workflow_id: string;
+  title: string;
+  messages: WorkflowChatMessage[];
+  plan: AgentAssistResponse;
+  completed_task_ids: string[];
+  created_at?: string;
+  updated_at?: string;
 };

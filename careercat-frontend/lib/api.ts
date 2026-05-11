@@ -7,6 +7,7 @@ import type {
   JobRecommendation,
   JobUpdatePayload,
   UserProfile,
+  WorkflowHistoryEntry,
 } from "./types";
 
 const API_BASE_URL =
@@ -406,6 +407,58 @@ export async function sendAgentAssist(payload: AgentAssistRequest) {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(errorText || "Failed to run the workflow agent");
+  }
+
+  return response.json();
+}
+
+export async function fetchWorkflowHistory(
+  userId: string
+): Promise<{ user_id: string; workflows: WorkflowHistoryEntry[] }> {
+  const response = await fetch(`${API_BASE_URL}/workflows/history/${userId}`, {
+    headers: await buildHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to fetch workflow history");
+  }
+
+  return response.json();
+}
+
+export async function saveWorkflowHistory(workflow: WorkflowHistoryEntry) {
+  const response = await fetch(
+    `${API_BASE_URL}/workflows/history/${workflow.user_id}/${workflow.workflow_id}`,
+    {
+      method: "PUT",
+      headers: await buildHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify(workflow),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to save workflow history");
+  }
+
+  return response.json();
+}
+
+export async function deleteWorkflowHistory(userId: string, workflowId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/workflows/history/${userId}/${workflowId}`,
+    {
+      method: "DELETE",
+      headers: await buildHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to delete workflow history");
   }
 
   return response.json();

@@ -1,5 +1,6 @@
 import AuthGate from "@/components/AuthGate";
 import AppShell from "@/components/AppShell";
+import PaintingCanvas from "@/components/PaintingCanvas";
 
 export default function AppLayout({
   children,
@@ -10,26 +11,13 @@ export default function AppLayout({
     <div
       data-surface="light"
       data-theme="app"
-      className="relative min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]"
+      className="relative min-h-screen text-[var(--color-text-primary)]"
+      style={{ background: "#fdfbf6" }}
     >
-      {/* Decorative ambient gradient — subtle so it doesn't fight content.
-          Blue tones pair with the in-app accent. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-0 mx-auto h-[420px] max-w-[1100px] -translate-y-1/3 opacity-70 blur-3xl"
-        style={{
-          background:
-            "radial-gradient(60% 50% at 50% 50%, rgba(59,130,246,0.20) 0%, rgba(59,130,246,0) 70%)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed -bottom-40 left-0 z-0 h-[360px] w-[520px] -translate-x-1/4 opacity-60 blur-3xl"
-        style={{
-          background:
-            "radial-gradient(50% 50% at 50% 50%, rgba(147,197,253,0.22) 0%, rgba(147,197,253,0) 70%)",
-        }}
-      />
+      {/* Static textured brand background — sits at z-0, fixed, covers the full viewport */}
+      <PaintingCanvas opacity={1} variant="brand" seed={9} flowSpeed={0.32} />
+
+      {/* App shell at z-10 so it renders above the background */}
       <div className="relative z-10">
         <AuthGate>
           <AppShell>{children}</AppShell>
