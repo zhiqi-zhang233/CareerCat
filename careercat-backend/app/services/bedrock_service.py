@@ -32,9 +32,10 @@ def generate_structured_json(
     user_prompt: str,
     temperature: float = 0.1,
     max_tokens: int = 2000,
+    model_id: str | None = None,
 ):
     response = bedrock_runtime.converse(
-        modelId=BEDROCK_MODEL_ID,
+        modelId=model_id or BEDROCK_MODEL_ID,
         system=[
             {
                 "text": system_prompt,
@@ -61,9 +62,10 @@ def generate_text(
     user_prompt: str,
     temperature: float = 0.4,
     max_tokens: int = 1800,
+    model_id: str | None = None,
 ):
     response = bedrock_runtime.converse(
-        modelId=BEDROCK_MODEL_ID,
+        modelId=model_id or BEDROCK_MODEL_ID,
         system=[
             {
                 "text": system_prompt,

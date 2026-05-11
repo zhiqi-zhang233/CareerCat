@@ -1,4 +1,8 @@
 from app.services.bedrock_service import generate_structured_json
+from app.services.workflow_agent_registry import (
+    build_workflow_orchestrator_prompt,
+    workflow_agent_model_id,
+)
 
 
 ALLOWED_ROUTES = {
@@ -39,96 +43,7 @@ def decide_next_step(
     locale: str = "en",
 ):
     locale_directive = _LOCALE_INSTRUCTION.get(locale, _LOCALE_INSTRUCTION["en"])
-    system_prompt = f"""
-{locale_directive}
-
-"""
-    system_prompt += """
-You are CareerCat Workflow Coordinator, a multi-stage planning agent for an AI job-search web app.
-
-CareerCat has these tools and pages:
-1. go_to_profile -> /profile
-   Use when the user needs to create or edit their resume profile, goals, skills,
-   locations, or visa sponsorship preference.
-2. search_adzuna_jobs -> /recommendations
-   Use when the user wants to find fresh jobs by keyword, location, salary, date,
-   remote preference, or recommendations.
-3. parse_job_post -> /import-jobs
-   Use when the user has a job post or job description to paste/import/parse.
-4. view_dashboard -> /dashboard
-   Use when the user wants to track saved jobs, update application status, dates,
-   notes, or review their application pipeline.
-5. view_insights -> /insights
-   Use when the user wants analytics, progress reports, application funnel,
-   response rates, skill summaries, or "how am I doing" overviews.
-6. start_gap_analysis -> /coach
-   Use when the user wants resume-vs-job gap analysis or wants to improve a resume
-   for a selected saved job.
-7. start_mock_interview -> /coach
-   Use when the user wants technical or behavioral interview practice.
-8. start_written_practice -> /coach
-   Use when the user wants written assessment, coding test, SQL, analytics,
-   statistics, or technical skill practice.
-9. offer_platform_guidance -> /workspace
-   Use when the user sends a greeting, small talk, unclear text, off-topic text,
-   nonsense, or a vague request that does not yet point to a CareerCat workflow.
-   Do not force a page route. Briefly explain what CareerCat can help with and
-   ask one simple question that helps the user choose a workflow.
-10. ask_followup_question -> /workspace
-   Use only when the user goal is related to CareerCat but still too ambiguous
-   to choose a useful route.
-
-You must choose exactly one selected_tool.
-Return ONLY valid JSON.
-Do not include markdown.
-
-JSON schema:
-{
-  "reply": "short helpful assistant response",
-  "intent": "profile_setup | job_discovery | job_import | dashboard_tracking | gap_analysis | mock_interview | written_practice | general_guidance | unclear",
-  "selected_tool": "one allowed tool",
-  "route": "/workspace | /profile | /recommendations | /import-jobs | /dashboard | /insights | /coach",
-  "reason": "why this tool was selected",
-  "needs_user_input": true,
-  "follow_up_question": "string or null",
-  "tool_args": {
-    "keywords": "string",
-    "location": "string",
-    "posted_within_days": 7,
-    "mode": "gap_analysis | mock_interview | written_practice",
-    "subtype": "technical | behavioral",
-    "focus_topic": "string"
-  },
-  "workflow_goal": "the user's overall goal in one sentence",
-  "current_stage_id": "stage id for the next best action",
-  "stages": [
-    {
-      "id": "understand_goal",
-      "title": "stage title",
-      "agent": "Goal Agent | Profile Agent | Job Search Agent | Fit Agent | Coach Agent | Tracker Agent",
-      "action": "what this stage does",
-      "route": "/profile",
-      "depends_on": ["previous_stage_id"],
-      "status": "ready | blocked | planned | complete",
-      "needs_user_input": true,
-      "output": "expected output"
-    }
-  ]
-}
-
-Rules:
-1. If the user asks to find jobs, extract keywords, location, and date window when possible.
-2. If the user asks for interview practice, route to /coach and set mode/subtype/focus_topic.
-3. If the user asks for written assessment practice, route to /coach and set mode/focus_topic.
-4. If the user asks about a specific saved job or resume gap, route to /coach with mode gap_analysis.
-5. If important details are missing but a route is still obvious, choose the route and ask a brief follow-up.
-6. If the message is only a greeting, small talk, random text, or not connected
-   to a job-search task, choose offer_platform_guidance and route "/workspace".
-7. Keep reply under 80 words.
-8. For multi-step goals, create 4-7 ordered stages with dependencies.
-9. Mark stages that require missing user data as blocked or ready with needs_user_input true.
-10. The current_stage_id must point to the first ready stage the user should do next.
-"""
+    system_prompt = build_workflow_orchestrator_prompt(locale_directive)
 
     profile_context = _profile_summary(profile)
     user_prompt = f"""
@@ -146,12 +61,13 @@ User message:
             user_prompt=user_prompt,
             temperature=0.1,
             max_tokens=900,
+            model_id=workflow_agent_model_id("orchestrator"),
         )
     except Exception as e:
         print(f"[Workflow Coordinator] Bedrock decision failed, using fallback. Error: {e}")
         decision = _fallback_decision(message, locale)
 
-    return _normalize_decision(decision)
+    return _normalize_decision(decision, locale)
 
 
 def _profile_summary(profile: dict | None):
@@ -168,7 +84,7 @@ def _profile_summary(profile: dict | None):
     )
 
 
-def _normalize_decision(decision: dict):
+def _normalize_decision(decision: dict, locale: str = "en"):
     selected_tool = decision.get("selected_tool") or "ask_followup_question"
     if selected_tool not in ALLOWED_TOOLS:
         selected_tool = "ask_followup_question"
@@ -208,7 +124,100 @@ def _normalize_decision(decision: dict):
         "workflow_goal": workflow_goal,
         "current_stage_id": current_stage_id,
         "stages": stages,
+        "suggested_actions": _normalize_suggested_actions(
+            decision.get("suggested_actions"),
+            stages=stages,
+            locale=locale,
+        ),
+        "harness": _harness_summary(stages, normalized["selected_tool"], route),
     }
+
+
+def _harness_summary(stages: list[dict], selected_tool: str, route: str):
+    agents = []
+    for stage in stages:
+        agent = stage.get("agent")
+        if agent and agent not in agents:
+            agents.append(agent)
+    return {
+        "mode": "multi_agent_harness",
+        "coordinator": "Harness Coordinator",
+        "selected_handoff": _agent_for_tool(selected_tool),
+        "next_route": route,
+        "agents": agents,
+        "todo_count": len(stages),
+        "ready_count": len([stage for stage in stages if stage.get("status") == "ready"]),
+        "blocked_count": len([stage for stage in stages if stage.get("status") == "blocked"]),
+    }
+
+
+def _normalize_suggested_actions(raw_actions, stages: list[dict], locale: str):
+    actions = []
+    if isinstance(raw_actions, list):
+        for index, action in enumerate(raw_actions[:4]):
+            if not isinstance(action, dict):
+                continue
+            route = action.get("route")
+            if route not in ALLOWED_ROUTES:
+                continue
+            action_id = str(action.get("id") or f"suggested_action_{index + 1}")
+            label = str(action.get("label") or _action_label_for_route(route, locale))
+            actions.append(
+                {
+                    "id": action_id,
+                    "label": label,
+                    "route": route,
+                    "reason": str(action.get("reason") or ""),
+                }
+            )
+
+    if actions:
+        return _dedupe_actions(actions)
+
+    generated = []
+    for stage in stages:
+        route = stage.get("route")
+        if route in {"/workspace", "/"} or route not in ALLOWED_ROUTES:
+            continue
+        generated.append(
+            {
+                "id": f"open_{str(route).strip('/').replace('-', '_') or 'workspace'}",
+                "label": _action_label_for_route(route, locale),
+                "route": route,
+                "reason": str(stage.get("action") or stage.get("title") or ""),
+            }
+        )
+        if len(generated) >= 4:
+            break
+    return _dedupe_actions(generated)
+
+
+def _dedupe_actions(actions: list[dict]):
+    seen = set()
+    deduped = []
+    for action in actions:
+        key = action.get("route")
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(action)
+    return deduped
+
+
+def _action_label_for_route(route: str, locale: str):
+    zh = locale == "zh"
+    labels = {
+        "/profile": ("查看并完善简历资料", "Review and complete profile"),
+        "/recommendations": ("按要求推荐岗位", "Find matching jobs"),
+        "/import-jobs": ("输入或导入岗位描述", "Import a job description"),
+        "/dashboard": ("查看投递面板", "Open application dashboard"),
+        "/insights": ("查看进度分析", "Review progress insights"),
+        "/coach": ("进行差距分析或面试练习", "Start gap analysis or coaching"),
+        "/workspace": ("继续和智能体沟通", "Continue with the agent"),
+        "/": ("回到主页", "Go home"),
+    }
+    label_zh, label_en = labels.get(route, ("继续下一步", "Continue next step"))
+    return label_zh if zh else label_en
 
 
 def _route_for_tool(selected_tool: str):
@@ -284,6 +293,10 @@ def _fallback_decision(message: str, locale: str = "en"):
             "current_stage_id": "clarify_goal",
             "stages": _guidance_stages(),
         }
+
+    harness_decision = _fallback_harness_decision(message, locale)
+    if harness_decision:
+        return harness_decision
 
     if any(word in lower for word in ["find", "search", "recommend", "jobs", "roles", "找", "搜", "推荐", "岗位"]):
         return {
@@ -375,8 +388,218 @@ def _looks_like_general_or_empty_input(message: str):
             "recommend",
             "search",
             "import",
+            "简历",
+            "个人资料",
+            "岗位",
+            "职位",
+            "投递",
+            "面试",
+            "笔试",
+            "练习",
+            "匹配",
+            "差距",
+            "推荐",
+            "导入",
+            "追踪",
+            "分析",
         ]
     )
+
+
+_INTENT_KEYWORDS = {
+    "profile_setup": ["resume", "cv", "profile", "skill", "target", "简历", "个人资料", "技能", "目标"],
+    "job_discovery": ["find", "search", "recommend", "job", "role", "h1b", "visa", "sponsor", "找", "搜", "推荐", "岗位", "职位", "担保"],
+    "job_import": ["import", "paste", "jd", "description", "post", "parse", "导入", "粘贴", "岗位描述", "解析"],
+    "dashboard_tracking": ["track", "dashboard", "status", "application", "pipeline", "投递", "面板", "追踪", "状态", "看板"],
+    "insights": ["insight", "analytics", "progress", "funnel", "report", "数据", "分析", "进度", "漏斗", "报告"],
+    "gap_analysis": ["gap", "fit", "match", "improve", "tailor", "差距", "匹配", "优化", "改简历"],
+    "mock_interview": ["interview", "mock", "behavioral", "technical", "面试", "模拟", "行为面"],
+    "written_practice": ["assessment", "practice", "sql", "python", "coding", "test", "笔试", "练习", "代码", "测评"],
+}
+
+
+def _fallback_harness_decision(message: str, locale: str):
+    lower = message.strip().lower()
+    detected = [
+        intent
+        for intent, keywords in _INTENT_KEYWORDS.items()
+        if any(keyword in lower for keyword in keywords)
+    ]
+    if not detected:
+        return None
+
+    stages = _build_harness_stages(detected, locale)
+    selected_tool, route, intent = _handoff_for_stage(stages[0])
+    if any(item in detected for item in ["mock_interview", "written_practice", "gap_analysis"]):
+        selected_tool = {
+            "gap_analysis": "start_gap_analysis",
+            "mock_interview": "start_mock_interview",
+            "written_practice": "start_written_practice",
+        }.get(next(item for item in ["gap_analysis", "mock_interview", "written_practice"] if item in detected), selected_tool)
+        route = "/coach"
+        intent = next(item for item in ["gap_analysis", "mock_interview", "written_practice"] if item in detected)
+    elif "job_discovery" in detected:
+        selected_tool = "search_adzuna_jobs"
+        route = "/recommendations"
+        intent = "job_discovery"
+    elif "job_import" in detected:
+        selected_tool = "parse_job_post"
+        route = "/import-jobs"
+        intent = "job_import"
+    elif "profile_setup" in detected:
+        selected_tool = "go_to_profile"
+        route = "/profile"
+        intent = "profile_setup"
+    elif "dashboard_tracking" in detected:
+        selected_tool = "view_dashboard"
+        route = "/dashboard"
+        intent = "dashboard_tracking"
+    elif "insights" in detected:
+        selected_tool = "view_insights"
+        route = "/insights"
+        intent = "insights"
+
+    if locale == "zh":
+        reply = "我会用 Harness Coordinator 把这个复杂目标拆成可执行 todo，并按 Profile、Search、Tracker、Fit、Coach 等子智能体依次交接。"
+        reason = "该请求包含多个求职子任务，需要由多智能体 harness 拆分、排序并跟踪依赖。"
+        goal = _zh_goal_from_intents(detected)
+    else:
+        reply = "I will use the Harness Coordinator to split this complex goal into executable todos and hand work across the Profile, Search, Tracker, Fit, and Coach agents."
+        reason = "The request contains multiple job-search subtasks, so it needs a multi-agent harness plan with dependencies."
+        goal = _en_goal_from_intents(detected)
+
+    return {
+        "reply": reply,
+        "intent": intent,
+        "selected_tool": selected_tool,
+        "route": route,
+        "reason": reason,
+        "needs_user_input": True,
+        "follow_up_question": None,
+        "tool_args": _extract_tool_args(message, detected),
+        "workflow_goal": goal,
+        "current_stage_id": _first_ready_stage_id(stages),
+        "stages": stages,
+    }
+
+
+def _build_harness_stages(detected: list[str], locale: str):
+    zh = locale == "zh"
+    specs = []
+
+    def add(stage_id, title_en, title_zh, agent, route, action_en, action_zh, output_en, output_zh):
+        if stage_id in [item[0] for item in specs]:
+            return
+        specs.append((stage_id, title_en, title_zh, agent, route, action_en, action_zh, output_en, output_zh))
+
+    add(
+        "clarify_constraints",
+        "Clarify Constraints",
+        "明确约束条件",
+        "Harness Coordinator",
+        "/workspace",
+        "Turn the messy request into scope, constraints, and acceptance criteria.",
+        "把复杂需求整理成目标、限制条件和完成标准。",
+        "Clear execution brief.",
+        "清晰的执行说明。",
+    )
+    if "profile_setup" in detected or "job_discovery" in detected or "gap_analysis" in detected:
+        add("profile_context", "Prepare Profile Context", "准备简历上下文", "Profile Agent", "/profile", "Check resume, skills, target roles, location, and sponsorship needs.", "检查简历、技能、目标岗位、地点和身份/担保需求。", "Profile context for downstream agents.", "后续智能体可使用的个人资料上下文。")
+    if "job_import" in detected:
+        add("parse_job_post", "Parse Job Post", "解析岗位描述", "Job Parser Agent", "/import-jobs", "Extract structured fields from the pasted job description.", "从粘贴的岗位描述中提取结构化字段。", "Editable job record.", "可编辑的岗位记录。")
+    if "job_discovery" in detected:
+        add("search_jobs", "Search Matching Jobs", "搜索匹配岗位", "Job Search Agent", "/recommendations", "Search and shortlist jobs using role, location, sponsorship, salary, and recency constraints.", "基于岗位、地点、担保、薪资和发布时间筛选岗位。", "Shortlisted jobs.", "候选岗位清单。")
+        add("rank_jobs", "Rank and Filter", "排序与筛选", "Fit Agent", "/recommendations", "Rank jobs by profile fit, missing skills, and practical constraints.", "按简历匹配度、技能差距和实际限制对岗位排序。", "Ranked recommendation list.", "排序后的推荐列表。")
+    if "dashboard_tracking" in detected or "job_discovery" in detected or "job_import" in detected:
+        add("save_and_track", "Save and Track", "保存并追踪", "Tracker Agent", "/dashboard", "Save selected jobs and turn next actions into application-tracking items.", "保存选中的岗位，并把下一步动作放进投递追踪。", "Tracked job pipeline.", "可追踪的投递管线。")
+    if "insights" in detected or "dashboard_tracking" in detected:
+        add("review_progress", "Review Progress", "复盘进度", "Insights Agent", "/insights", "Summarize funnel health, response rates, and bottlenecks.", "汇总投递漏斗、回复率和当前瓶颈。", "Progress snapshot.", "求职进度快照。")
+    if "gap_analysis" in detected:
+        add("analyze_fit", "Analyze Fit Gaps", "分析匹配差距", "Fit Agent", "/coach", "Compare resume context against selected jobs and identify gaps.", "对比简历与目标岗位，识别技能和经历差距。", "Gap analysis.", "差距分析。")
+    if "mock_interview" in detected:
+        add("mock_interview", "Run Interview Practice", "进行模拟面试", "Coach Agent", "/coach", "Run technical or behavioral practice based on the target role.", "基于目标岗位进行技术或行为面试练习。", "Interview practice session.", "模拟面试练习。")
+    if "written_practice" in detected:
+        add("written_practice", "Practice Assessment", "练习笔试测评", "Coach Agent", "/coach", "Create SQL, Python, analytics, or written assessment drills.", "生成 SQL、Python、数据分析或笔试测评练习。", "Practice set and feedback loop.", "练习题与反馈循环。")
+
+    stages = []
+    previous_ids = []
+    for index, spec in enumerate(specs[:7]):
+        stage_id, title_en, title_zh, agent, route, action_en, action_zh, output_en, output_zh = spec
+        status = "complete" if index == 0 else ("ready" if index == 1 else "planned")
+        stages.append(_stage(stage_id, title_zh if zh else title_en, agent, route, action_zh if zh else action_en, previous_ids[-1:] if previous_ids else [], status, True, output_zh if zh else output_en))
+        previous_ids.append(stage_id)
+    return stages
+
+
+def _handoff_for_stage(stage: dict):
+    route = stage.get("route", "/workspace")
+    route_tool = {
+        "/profile": "go_to_profile",
+        "/recommendations": "search_adzuna_jobs",
+        "/import-jobs": "parse_job_post",
+        "/dashboard": "view_dashboard",
+        "/insights": "view_insights",
+        "/coach": "start_gap_analysis",
+    }
+    selected_tool = route_tool.get(route, "offer_platform_guidance")
+    return selected_tool, route, {
+        "/profile": "profile_setup",
+        "/recommendations": "job_discovery",
+        "/import-jobs": "job_import",
+        "/dashboard": "dashboard_tracking",
+        "/insights": "insights",
+        "/coach": "gap_analysis",
+    }.get(route, "general_guidance")
+
+
+def _extract_tool_args(message: str, detected: list[str]):
+    args = {"source": "fallback_harness"}
+    lower = message.lower()
+    if "sql" in lower:
+        args["focus_topic"] = "SQL"
+    elif "python" in lower:
+        args["focus_topic"] = "Python"
+    if any(term in lower for term in ["chicago", "芝加哥"]):
+        args["location"] = "Chicago"
+    if any(term in lower for term in ["h1b", "visa", "sponsor", "担保"]):
+        args["sponsorship"] = True
+    if "written_practice" in detected:
+        args["mode"] = "written_practice"
+    elif "mock_interview" in detected:
+        args["mode"] = "mock_interview"
+    elif "gap_analysis" in detected:
+        args["mode"] = "gap_analysis"
+    return args
+
+
+def _zh_goal_from_intents(detected: list[str]):
+    if len(detected) > 1:
+        return "把复杂求职目标拆成可执行的多智能体 todo，并按依赖推进。"
+    return {
+        "profile_setup": "完善个人资料，为后续匹配和辅导提供上下文。",
+        "job_discovery": "寻找并筛选匹配岗位。",
+        "job_import": "导入岗位描述并生成结构化记录。",
+        "dashboard_tracking": "追踪投递状态并安排下一步。",
+        "insights": "复盘求职进度并识别瓶颈。",
+        "gap_analysis": "分析简历与目标岗位的差距。",
+        "mock_interview": "进行针对性的模拟面试练习。",
+        "written_practice": "进行笔试或技术测评练习。",
+    }.get(detected[0], "规划下一步求职工作流。")
+
+
+def _en_goal_from_intents(detected: list[str]):
+    if len(detected) > 1:
+        return "Break a complex job-search goal into executable multi-agent todos with dependencies."
+    return {
+        "profile_setup": "Prepare profile context for matching and coaching.",
+        "job_discovery": "Find and prioritize matching jobs.",
+        "job_import": "Import a job description into a structured record.",
+        "dashboard_tracking": "Track applications and next actions.",
+        "insights": "Review progress and identify bottlenecks.",
+        "gap_analysis": "Analyze profile-to-job fit gaps.",
+        "mock_interview": "Run targeted mock interview practice.",
+        "written_practice": "Practice for written or technical assessments.",
+    }.get(detected[0], "Plan the next useful job-search workflow.")
 
 
 def _goal_for_intent(intent: str):
@@ -418,7 +641,7 @@ def _normalize_stages(raw_stages, selected_tool: str, route: str, intent: str):
                     "output": str(stage.get("output") or "A usable result for the next stage."),
                 }
             )
-        if len(stages) >= 4:
+        if stages:
             return stages
 
     if intent == "job_discovery":
@@ -431,6 +654,8 @@ def _normalize_stages(raw_stages, selected_tool: str, route: str, intent: str):
         return _profile_stages()
     if intent == "dashboard_tracking":
         return _dashboard_stages()
+    if intent == "insights":
+        return _insights_stages()
     return _guidance_stages()
 
 
@@ -505,6 +730,14 @@ def _dashboard_stages():
         _stage("update_records", "Update Records", "Tracker Agent", "/dashboard", "Edit job details, application dates, notes, and statuses.", ["review_pipeline"], "ready", True, "Current application data."),
         _stage("choose_priority", "Choose Priority", "Fit Agent", "/dashboard", "Identify which applications need action first.", ["update_records"], "planned", True, "Priority list."),
         _stage("prepare_next", "Prepare Next Action", "Coach Agent", "/coach", "Use the highest-priority saved job for gap analysis or practice.", ["choose_priority"], "planned", True, "Preparation workflow."),
+    ]
+
+
+def _insights_stages():
+    return [
+        _stage("open_insights", "Review Progress Insights", "Insights Agent", "/insights", "Open progress analytics to review funnel health, response rate, and bottlenecks.", [], "ready", True, "Progress insights."),
+        _stage("update_pipeline", "Update Tracking Data", "Tracker Agent", "/dashboard", "Update application records if the insights are missing enough tracking data.", ["open_insights"], "planned", True, "Current tracking data."),
+        _stage("choose_next_action", "Choose Next Action", "Coach Agent", "/coach", "Turn the biggest bottleneck into a preparation or follow-up action.", ["update_pipeline"], "planned", True, "Next improvement action."),
     ]
 
 

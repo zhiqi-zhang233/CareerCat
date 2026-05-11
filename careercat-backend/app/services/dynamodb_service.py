@@ -6,6 +6,7 @@ from app.config import (
     AWS_REGION,
     DYNAMODB_AGENT_RUNS_TABLE,
     DYNAMODB_COACH_SESSIONS_TABLE,
+    DYNAMODB_WORKFLOW_HISTORIES_TABLE,
     DYNAMODB_USER_PROFILES_TABLE,
     DYNAMODB_JOB_POSTS_TABLE,
 )
@@ -16,6 +17,7 @@ user_profiles_table = dynamodb.Table(DYNAMODB_USER_PROFILES_TABLE)
 job_posts_table = dynamodb.Table(DYNAMODB_JOB_POSTS_TABLE)
 agent_runs_table = dynamodb.Table(DYNAMODB_AGENT_RUNS_TABLE)
 coach_sessions_table = dynamodb.Table(DYNAMODB_COACH_SESSIONS_TABLE)
+workflow_histories_table = dynamodb.Table(DYNAMODB_WORKFLOW_HISTORIES_TABLE)
 
 
 def _utc_now_iso() -> str:
@@ -205,6 +207,65 @@ def delete_coach_session(user_id: str, session_id: str):
         Key={
             "user_id": user_id,
             "session_id": session_id,
+        }
+    )
+    return True
+
+
+def save_workflow_history(workflow_data: dict):
+    existing = get_workflow_history_by_id(
+        workflow_data["user_id"],
+        workflow_data["workflow_id"],
+    )
+
+    item = {
+        **workflow_data,
+        "updated_at": _utc_now_iso(),
+    }
+
+    if existing:
+        item["created_at"] = existing.get(
+            "created_at",
+            workflow_data.get("created_at") or _utc_now_iso(),
+        )
+    else:
+        item["created_at"] = workflow_data.get("created_at") or _utc_now_iso()
+
+    workflow_histories_table.put_item(Item=item)
+    return item
+
+
+def get_workflow_histories_for_user(user_id: str):
+    response = workflow_histories_table.query(
+        KeyConditionExpression=Key("user_id").eq(user_id)
+    )
+    histories = response.get("Items", [])
+    return sorted(
+        histories,
+        key=lambda history: history.get("updated_at") or history.get("created_at") or "",
+        reverse=True,
+    )
+
+
+def get_workflow_history_by_id(user_id: str, workflow_id: str):
+    response = workflow_histories_table.get_item(
+        Key={
+            "user_id": user_id,
+            "workflow_id": workflow_id,
+        }
+    )
+    return response.get("Item")
+
+
+def delete_workflow_history(user_id: str, workflow_id: str):
+    existing = get_workflow_history_by_id(user_id, workflow_id)
+    if not existing:
+        return False
+
+    workflow_histories_table.delete_item(
+        Key={
+            "user_id": user_id,
+            "workflow_id": workflow_id,
         }
     )
     return True

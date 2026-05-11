@@ -27,3 +27,5 @@ class AgentAssistResponse(BaseModel):
     workflow_goal: str = ""
     current_stage_id: str = ""
     stages: list[Dict[str, Any]] = Field(default_factory=list)
+    suggested_actions: list[Dict[str, Any]] = Field(default_factory=list)
+    harness: Dict[str, Any] = Field(default_factory=dict)

@@ -20,7 +20,12 @@ def workflow_agent(
     user_id = resolve_user_id(payload.user_id, auth_user_id)
 
     try:
-        profile = get_user_profile(user_id)
+        try:
+            profile = get_user_profile(user_id)
+        except Exception as profile_exc:
+            print(f"[workflow-agent] profile lookup failed; continuing without profile: {profile_exc}")
+            profile = None
+
         decision = decide_next_step(
             message=payload.message,
             profile=profile,
