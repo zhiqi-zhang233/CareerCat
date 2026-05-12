@@ -210,8 +210,32 @@ JSON schema:
       "route": "/profile",
       "reason": "why this action is useful"
     }}
+  ],
+  "inline_actions": [
+    {{
+      "id": "unique_snake_case_id",
+      "type": "file_upload | navigate | quick_select | confirm_or_continue",
+      "label": "short user-visible label (under 8 words)",
+      "accept": ".pdf,.doc,.docx,.txt  (file_upload only)",
+      "target": "/route  (navigate only)",
+      "options": [{{"label": "...", "value": "..."}}],
+      "confirm_label": "View & edit on Profile  (confirm_or_continue only)",
+      "confirm_route": "/profile  (confirm_or_continue only)",
+      "continue_label": "Continue to next step  (confirm_or_continue only)",
+      "depends_on": "id_of_action_this_waits_for  (optional)"
+    }}
   ]
 }}
+
+inline_actions rules:
+- Generate inline_actions only for the FIRST user-actionable stage. Keep the list to 1-3 items.
+- profile_setup / first stage is /profile with no saved profile → add a "file_upload" action (accept ".pdf,.doc,.docx,.txt") THEN a "confirm_or_continue" with depends_on set to that file_upload id, confirm_route "/profile", confirm_label "View & edit on Profile", continue_label "Continue to next step".
+- job_import / first stage is /import-jobs → add a "navigate" action with target "/import-jobs".
+- job_discovery / first stage is /recommendations → add a "navigate" action with target "/recommendations".
+- needs_user_input is true and you want to present choices → add a "quick_select" with 2-4 short option labels.
+- Any other stage where the user needs to decide between reviewing a result page or continuing → add a "confirm_or_continue" with the appropriate confirm_route.
+- NEVER generate inline_actions for internal coordination stages (/workspace route).
+- If no inline_actions are relevant, return an empty array [].
 
 Rules:
 1. Choose exactly one selected_tool.

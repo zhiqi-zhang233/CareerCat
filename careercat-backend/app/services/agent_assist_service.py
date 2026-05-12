@@ -60,7 +60,7 @@ User message:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             temperature=0.1,
-            max_tokens=900,
+            max_tokens=1500,
             model_id=workflow_agent_model_id("orchestrator"),
         )
     except Exception as e:
@@ -126,6 +126,12 @@ def _normalize_decision(decision: dict, locale: str = "en"):
         "stages": stages,
         "suggested_actions": _normalize_suggested_actions(
             decision.get("suggested_actions"),
+            stages=stages,
+            locale=locale,
+        ),
+        "inline_actions": _normalize_inline_actions(
+            decision.get("inline_actions"),
+            intent=normalized["intent"],
             stages=stages,
             locale=locale,
         ),
@@ -202,6 +208,123 @@ def _dedupe_actions(actions: list[dict]):
         seen.add(key)
         deduped.append(action)
     return deduped
+
+
+_INLINE_ALLOWED_ROUTES = {
+    "/profile", "/recommendations", "/import-jobs",
+    "/dashboard", "/insights", "/coach",
+}
+_INLINE_ALLOWED_TYPES = {"file_upload", "navigate", "quick_select", "confirm_or_continue"}
+
+
+def _normalize_inline_actions(
+    raw: list | None,
+    intent: str,
+    stages: list[dict],
+    locale: str,
+) -> list[dict]:
+    zh = locale == "zh"
+
+    if isinstance(raw, list) and raw:
+        normalized: list[dict] = []
+        seen_ids: set[str] = set()
+        for item in raw[:6]:
+            if not isinstance(item, dict):
+                continue
+            action_type = item.get("type")
+            if action_type not in _INLINE_ALLOWED_TYPES:
+                continue
+            action_id = str(item.get("id") or f"inline_{len(normalized) + 1}")
+            if action_id in seen_ids:
+                continue
+            seen_ids.add(action_id)
+
+            action: dict = {
+                "id": action_id,
+                "type": action_type,
+                "label": str(item.get("label") or ""),
+            }
+            if action_type == "file_upload":
+                action["accept"] = str(item.get("accept") or ".pdf,.doc,.docx,.txt")
+            elif action_type == "navigate":
+                route = item.get("target")
+                if route not in _INLINE_ALLOWED_ROUTES:
+                    continue
+                action["target"] = route
+            elif action_type == "quick_select":
+                opts = item.get("options")
+                if not isinstance(opts, list) or not opts:
+                    continue
+                action["options"] = [
+                    {
+                        "label": str(o.get("label", "")),
+                        "value": str(o.get("value") or o.get("label", "")),
+                    }
+                    for o in opts[:6]
+                    if isinstance(o, dict) and o.get("label")
+                ]
+                if not action["options"]:
+                    continue
+            elif action_type == "confirm_or_continue":
+                route = item.get("confirm_route")
+                action["confirm_route"] = route if route in _INLINE_ALLOWED_ROUTES else None
+                action["confirm_label"] = str(item.get("confirm_label") or (
+                    "在资料页查看/修改" if zh else "View & edit on Profile"
+                ))
+                action["continue_label"] = str(item.get("continue_label") or (
+                    "直接进入下一步" if zh else "Continue to next step"
+                ))
+
+            if item.get("depends_on"):
+                action["depends_on"] = str(item["depends_on"])
+            if item.get("on_complete"):
+                action["on_complete"] = str(item["on_complete"])
+
+            normalized.append(action)
+
+        if normalized:
+            return normalized
+
+    # Fallback: generate default inline_actions for common intents
+    first_route = stages[0]["route"] if stages else "/workspace"
+    if intent == "profile_setup" or first_route == "/profile":
+        upload_id = "upload_resume"
+        return [
+            {
+                "id": upload_id,
+                "type": "file_upload",
+                "label": "上传简历（PDF / Word / TXT）" if zh else "Upload resume (PDF / Word / TXT)",
+                "accept": ".pdf,.doc,.docx,.txt",
+            },
+            {
+                "id": "after_upload_choice",
+                "type": "confirm_or_continue",
+                "label": "简历解析完成，接下来想做什么？" if zh else "Resume parsed! What would you like to do next?",
+                "confirm_label": "在资料页查看/修改" if zh else "View & edit on Profile",
+                "confirm_route": "/profile",
+                "continue_label": "直接进入下一步" if zh else "Continue to next step",
+                "depends_on": upload_id,
+            },
+        ]
+    if intent == "job_import" or first_route == "/import-jobs":
+        return [
+            {
+                "id": "go_import_jobs",
+                "type": "navigate",
+                "label": "打开岗位导入页面" if zh else "Open job import page",
+                "target": "/import-jobs",
+            }
+        ]
+    if intent == "job_discovery" or first_route == "/recommendations":
+        return [
+            {
+                "id": "go_recommendations",
+                "type": "navigate",
+                "label": "查看岗位推荐" if zh else "View job recommendations",
+                "target": "/recommendations",
+            }
+        ]
+    return []
 
 
 def _action_label_for_route(route: str, locale: str):

@@ -19,6 +19,8 @@
 - [2026-05-11] feat(backend): 新增用户注销 API（POST /user/request-deletion, DELETE /user），邮件验证码 + 永久删除 Cognito 用户及所有 DynamoDB 数据 | 文件: careercat-backend/app/routers/user.py, app/services/dynamodb_service.py
 - [2026-05-11] feat(i18n): 补充 settings 模块 emailLabel、cancel、deleteCodeSentInfo 中英文 key | 文件: lib/i18n/dictionaries.ts
 - [2026-05-11] improve(auth): 去除页面加载时的 loading 卡片，auth 检测期间返回 null，避免页面切换闪屏 | 文件: components/AuthGate.tsx
+- [2026-05-11] feat(workspace): 工作台对话内嵌交互操作（inline actions）—— 文件上传、页面导航、快速选项、解析后确认/继续 | 文件: components/InlineActionWidget.tsx, app/(app)/workspace/page.tsx, lib/types.ts
+- [2026-05-11] feat(backend): Orchestrator 新增 inline_actions 字段生成，含 fallback 逻辑；max_tokens 升至 1500 | 文件: careercat-backend/app/schemas/agent.py, app/services/agent_assist_service.py, app/services/workflow_agent_registry.py
 
 ---
 

@@ -199,6 +199,27 @@ export type AgentAssistRequest = {
   locale?: "en" | "zh";
 };
 
+export type InlineActionType = "file_upload" | "navigate" | "quick_select" | "confirm_or_continue";
+
+export type InlineAction = {
+  id: string;
+  type: InlineActionType;
+  label: string;
+  // file_upload
+  accept?: string;
+  // navigate
+  target?: string;
+  // quick_select
+  options?: { label: string; value: string }[];
+  // confirm_or_continue
+  confirm_label?: string;
+  confirm_route?: string;
+  continue_label?: string;
+  // flow
+  depends_on?: string;
+  on_complete?: string;
+};
+
 export type AgentAssistResponse = {
   reply: string;
   intent: string;
@@ -212,6 +233,7 @@ export type AgentAssistResponse = {
   current_stage_id: string;
   stages: WorkflowStage[];
   suggested_actions?: WorkflowSuggestedAction[];
+  inline_actions?: InlineAction[];
   harness?: {
     mode?: string;
     coordinator?: string;
@@ -248,6 +270,7 @@ export type WorkflowChatMessage = {
   role: "user" | "assistant";
   content: string;
   plan?: AgentAssistResponse;
+  inline_actions?: InlineAction[];
 };
 
 export type WorkflowHistoryEntry = {
@@ -257,6 +280,7 @@ export type WorkflowHistoryEntry = {
   messages: WorkflowChatMessage[];
   plan: AgentAssistResponse;
   completed_task_ids: string[];
+  completed_inline_action_ids?: string[];
   created_at?: string;
   updated_at?: string;
 };

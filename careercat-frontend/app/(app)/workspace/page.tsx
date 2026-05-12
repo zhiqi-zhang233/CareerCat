@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   createProfile,
@@ -15,12 +16,14 @@ import {
 } from "@/lib/api";
 import type {
   AgentAssistResponse,
+  InlineAction,
   ParsedResumeResponse,
   UserProfile,
   WorkflowChatMessage,
   WorkflowHistoryEntry,
   WorkflowStage,
 } from "@/lib/types";
+import InlineActionWidget, { type InlineActionEvent } from "@/components/InlineActionWidget";
 import { useLocalUserId } from "@/lib/useLocalUserId";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 
@@ -38,6 +41,7 @@ type ChatMessage = WorkflowChatMessage;
 
 export default function Workspace() {
   const { locale, t } = useLocale();
+  const router = useRouter();
   const userId = useLocalUserId();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -46,11 +50,15 @@ export default function Workspace() {
   const [workflowHistory, setWorkflowHistory] = useState<WorkflowHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
+  const [uploadingInlineActionId, setUploadingInlineActionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [resumeUploadMessage, setResumeUploadMessage] = useState("");
   const [profileAvailable, setProfileAvailable] = useState(false);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [completedInlineActionIds, setCompletedInlineActionIds] = useState<Set<string>>(
     () => new Set()
   );
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -138,11 +146,14 @@ export default function Workspace() {
   );
 
   const profileTask = actionableStages.find((stage) => stage.route === "/profile");
+  const hasInlineFileUpload = messages.some(
+    (m) => m.inline_actions?.some((a) => a.type === "file_upload")
+  );
   const showResumeUploadCard = Boolean(
-    profileTask && !completedTaskIds.has(profileTask.id)
+    profileTask && !completedTaskIds.has(profileTask.id) && !hasInlineFileUpload
   );
   const showResumeNextActions = Boolean(
-    profileTask && completedTaskIds.has(profileTask.id)
+    profileTask && completedTaskIds.has(profileTask.id) && !hasInlineFileUpload
   );
 
   const startNewWorkflow = () => {
@@ -154,6 +165,8 @@ export default function Workspace() {
     setNotice("");
     setResumeUploadMessage("");
     setCompletedTaskIds(new Set());
+    setCompletedInlineActionIds(new Set());
+    setUploadingInlineActionId(null);
     setPlaceholderIndex(0);
   };
 
@@ -178,6 +191,8 @@ export default function Workspace() {
     setMessages(entry.messages);
     setPlan(entry.plan);
     setCompletedTaskIds(new Set(entry.completed_task_ids));
+    setCompletedInlineActionIds(new Set(entry.completed_inline_action_ids || []));
+    setUploadingInlineActionId(null);
     setMessage("");
     setError("");
     setNotice("");
@@ -201,28 +216,17 @@ export default function Workspace() {
     }
   };
 
-  const runPlanner = async (event?: FormEvent<HTMLFormElement>) => {
-    event?.preventDefault();
-    if (!userId) {
-      setError(t("app.workspace.errorAccountLoading"));
-      return;
-    }
-    const prompt = message.trim();
-    if (!prompt) {
-      setError(t("app.workspace.errorEmptyMessage"));
-      return;
-    }
-
+  const sendMessage = async (text: string, currentMessages: ChatMessage[]) => {
+    if (!userId) return;
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: prompt,
+      content: text,
     };
-    const baseMessages = [...messages, userMessage];
+    const baseMessages = [...currentMessages, userMessage];
     const nextWorkflowId = workflowId || createWorkflowId();
     setWorkflowId(nextWorkflowId);
     setMessages(baseMessages);
-    setMessage("");
 
     try {
       setLoading(true);
@@ -232,7 +236,7 @@ export default function Workspace() {
       setCompletedTaskIds(new Set());
       const data = (await sendAgentAssist({
         user_id: userId,
-        message: prompt,
+        message: text,
         current_page: "/workspace",
         locale,
       })) as AgentAssistResponse;
@@ -241,6 +245,7 @@ export default function Workspace() {
         role: "assistant",
         content: formatAssistantMessage(data),
         plan: data,
+        inline_actions: data.inline_actions?.length ? data.inline_actions : undefined,
       };
       const nextMessages = [...baseMessages, assistantMessage];
       const nextCompleted = new Set<string>();
@@ -252,20 +257,22 @@ export default function Workspace() {
           userId,
           id: nextWorkflowId,
           previous: workflowHistory.find((item) => item.workflow_id === nextWorkflowId),
-          prompt,
+          prompt: text,
           messages: nextMessages,
           plan: data,
           completedTaskIds: nextCompleted,
+          completedInlineActionIds,
         })
       );
     } catch (agentError) {
       console.error(agentError);
-      const fallbackPlan = buildLocalHarnessPlan(prompt, locale);
+      const fallbackPlan = buildLocalHarnessPlan(text, locale);
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: formatAssistantMessage(fallbackPlan),
         plan: fallbackPlan,
+        inline_actions: fallbackPlan.inline_actions?.length ? fallbackPlan.inline_actions : undefined,
       };
       const nextMessages = [...baseMessages, assistantMessage];
       const nextCompleted = new Set<string>();
@@ -279,10 +286,11 @@ export default function Workspace() {
           userId,
           id: nextWorkflowId,
           previous: workflowHistory.find((item) => item.workflow_id === nextWorkflowId),
-          prompt,
+          prompt: text,
           messages: nextMessages,
           plan: fallbackPlan,
           completedTaskIds: nextCompleted,
+          completedInlineActionIds,
         })
       );
     } finally {
@@ -290,11 +298,23 @@ export default function Workspace() {
     }
   };
 
-  const handleResumeUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || !userId || !profileTask) return;
+  const runPlanner = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    if (!userId) {
+      setError(t("app.workspace.errorAccountLoading"));
+      return;
+    }
+    const prompt = message.trim();
+    if (!prompt) {
+      setError(t("app.workspace.errorEmptyMessage"));
+      return;
+    }
+    setMessage("");
+    await sendMessage(prompt, messages);
+  };
 
+  const uploadResumeFile = async (file: File, inlineActionId?: string) => {
+    if (!userId) return;
     const lowerName = file.name.toLowerCase();
     const allowed = [".txt", ".pdf", ".docx"];
     if (!allowed.some((ext) => lowerName.endsWith(ext))) {
@@ -304,15 +324,22 @@ export default function Workspace() {
 
     try {
       setUploadingResume(true);
+      if (inlineActionId) setUploadingInlineActionId(inlineActionId);
       setResumeUploadMessage("");
       const parsed = lowerName.endsWith(".txt")
         ? ((await parseResume(userId, await file.text())) as ParsedResumeResponse)
         : ((await parseResumeFile(userId, file)) as ParsedResumeResponse);
       await saveParsedProfile(userId, parsed);
       setProfileAvailable(true);
+
       const nextCompleted = new Set(completedTaskIds);
-      nextCompleted.add(profileTask.id);
+      if (profileTask) nextCompleted.add(profileTask.id);
       setCompletedTaskIds(nextCompleted);
+
+      const nextInlineCompleted = new Set(completedInlineActionIds);
+      if (inlineActionId) nextInlineCompleted.add(inlineActionId);
+      setCompletedInlineActionIds(nextInlineCompleted);
+
       const nextMessages = [
         ...messages,
         {
@@ -332,6 +359,7 @@ export default function Workspace() {
             messages: nextMessages,
             plan,
             completedTaskIds: nextCompleted,
+            completedInlineActionIds: nextInlineCompleted,
           })
         );
       }
@@ -341,6 +369,47 @@ export default function Workspace() {
       setResumeUploadMessage(t("app.workspace.resumeUploadError"));
     } finally {
       setUploadingResume(false);
+      setUploadingInlineActionId(null);
+    }
+  };
+
+  const handleResumeUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    await uploadResumeFile(file);
+  };
+
+  const handleInlineAction = async (event: InlineActionEvent) => {
+    switch (event.type) {
+      case "file_upload":
+        await uploadResumeFile(event.file, event.actionId);
+        break;
+      case "quick_select": {
+        const nextIds = new Set(completedInlineActionIds);
+        nextIds.add(event.actionId);
+        setCompletedInlineActionIds(nextIds);
+        await sendMessage(event.option, messages);
+        break;
+      }
+      case "navigate": {
+        const nextIds = new Set(completedInlineActionIds);
+        nextIds.add(event.actionId);
+        setCompletedInlineActionIds(nextIds);
+        break;
+      }
+      case "confirm_or_continue": {
+        const nextIds = new Set(completedInlineActionIds);
+        nextIds.add(event.actionId);
+        setCompletedInlineActionIds(nextIds);
+        if (event.choice === "continue") {
+          const continueText =
+            event.continueText ||
+            (locale === "zh" ? "好的，直接进行下一步" : "OK, please continue to the next step");
+          await sendMessage(continueText, messages);
+        }
+        break;
+      }
     }
   };
 
@@ -397,7 +466,13 @@ export default function Workspace() {
               </div>
             ) : (
               messages.map((item) => (
-                <ChatBubble key={item.id} message={item} />
+                <ChatBubble
+                  key={item.id}
+                  message={item}
+                  completedInlineActionIds={completedInlineActionIds}
+                  uploadingInlineActionId={uploadingInlineActionId}
+                  onInlineAction={handleInlineAction}
+                />
               ))
             )}
             {loading && (
@@ -723,9 +798,15 @@ function WorkflowHistoryPanel({
 function ChatBubble({
   message,
   thinking = false,
+  completedInlineActionIds,
+  uploadingInlineActionId,
+  onInlineAction,
 }: {
   message: ChatMessage;
   thinking?: boolean;
+  completedInlineActionIds?: Set<string>;
+  uploadingInlineActionId?: string | null;
+  onInlineAction?: (event: InlineActionEvent) => void;
 }) {
   const isUser = message.role === "user";
   return (
@@ -744,6 +825,14 @@ function ChatBubble({
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:120ms]" />
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:240ms]" />
           </span>
+        )}
+        {!isUser && message.inline_actions && message.inline_actions.length > 0 && (
+          <InlineActionWidget
+            actions={message.inline_actions}
+            completedIds={completedInlineActionIds ?? new Set()}
+            uploadingId={uploadingInlineActionId ?? null}
+            onAction={onInlineAction}
+          />
         )}
       </div>
     </div>
@@ -948,6 +1037,7 @@ function createHistoryEntry({
   messages,
   plan,
   completedTaskIds,
+  completedInlineActionIds,
 }: {
   userId: string;
   id: string;
@@ -956,6 +1046,7 @@ function createHistoryEntry({
   messages: ChatMessage[];
   plan: AgentAssistResponse;
   completedTaskIds: Set<string>;
+  completedInlineActionIds?: Set<string>;
 }): WorkflowHistoryEntry {
   const now = new Date().toISOString();
   return {
@@ -965,6 +1056,7 @@ function createHistoryEntry({
     messages,
     plan,
     completed_task_ids: Array.from(completedTaskIds),
+    completed_inline_action_ids: completedInlineActionIds ? Array.from(completedInlineActionIds) : [],
     created_at: previous?.created_at || now,
     updated_at: now,
   };
