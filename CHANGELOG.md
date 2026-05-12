@@ -18,6 +18,7 @@
 - [2026-05-11] feat(settings): 注销账号需邮箱验证码确认，提醒用户数据永久删除 | 文件: app/(app)/settings/page.tsx
 - [2026-05-11] feat(backend): 新增用户注销 API（POST /user/request-deletion, DELETE /user），邮件验证码 + 永久删除 Cognito 用户及所有 DynamoDB 数据 | 文件: careercat-backend/app/routers/user.py, app/services/dynamodb_service.py
 - [2026-05-11] feat(i18n): 补充 settings 模块 emailLabel、cancel、deleteCodeSentInfo 中英文 key | 文件: lib/i18n/dictionaries.ts
+- [2026-05-11] improve(auth): 去除页面加载时的 loading 卡片，auth 检测期间返回 null，避免页面切换闪屏 | 文件: components/AuthGate.tsx
 
 ---
 

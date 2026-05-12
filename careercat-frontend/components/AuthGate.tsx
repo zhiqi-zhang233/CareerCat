@@ -65,18 +65,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   if (!auth.isCognito) return <>{children}</>;
 
-  if (auth.status === "loading") {
-    return (
-      <main
-        className="flex min-h-screen items-center justify-center px-6"
-        style={{ background: "var(--brand-cream-50)", ...lightThemeVars }}
-      >
-        <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] px-8 py-6 text-[var(--color-text-secondary)]">
-          {t("auth.loadingAccount")}
-        </div>
-      </main>
-    );
-  }
+  if (auth.status === "loading") return null;
 
   if (auth.status === "authenticated") return <>{children}</>;
 
