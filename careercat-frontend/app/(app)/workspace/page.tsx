@@ -83,7 +83,7 @@ export default function Workspace() {
     if (hasConversation) return;
     const timer = window.setInterval(() => {
       setPlaceholderIndex((index) => index + 1);
-    }, 2800);
+    }, 4500);
     return () => window.clearInterval(timer);
   }, [hasConversation]);
 
@@ -513,7 +513,10 @@ export default function Workspace() {
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                if (event.key === "Tab") {
+                  event.preventDefault();
+                  if (!message) setMessage(rotatingPlaceholder);
+                } else if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   runPlanner();
                 }
