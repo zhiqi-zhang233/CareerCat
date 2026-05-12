@@ -269,3 +269,42 @@ def delete_workflow_history(user_id: str, workflow_id: str):
         }
     )
     return True
+
+
+def delete_all_user_data(user_id: str) -> dict:
+    """Delete every record belonging to user_id across all tables."""
+    counts = {"user_profiles": 0, "job_posts": 0, "agent_runs": 0,
+               "coach_sessions": 0, "workflow_histories": 0}
+
+    # UserProfiles (PK only)
+    if get_user_profile(user_id):
+        user_profiles_table.delete_item(Key={"user_id": user_id})
+        counts["user_profiles"] = 1
+
+    def _delete_all(table, items: list, key_fn):
+        for item in items:
+            table.delete_item(Key=key_fn(item))
+        return len(items)
+
+    counts["job_posts"] = _delete_all(
+        job_posts_table,
+        get_job_posts_for_user(user_id),
+        lambda i: {"user_id": user_id, "job_id": i["job_id"]},
+    )
+    counts["agent_runs"] = _delete_all(
+        agent_runs_table,
+        agent_runs_table.query(KeyConditionExpression=Key("user_id").eq(user_id)).get("Items", []),
+        lambda i: {"user_id": user_id, "run_id": i["run_id"]},
+    )
+    counts["coach_sessions"] = _delete_all(
+        coach_sessions_table,
+        get_coach_sessions_for_user(user_id),
+        lambda i: {"user_id": user_id, "session_id": i["session_id"]},
+    )
+    counts["workflow_histories"] = _delete_all(
+        workflow_histories_table,
+        get_workflow_histories_for_user(user_id),
+        lambda i: {"user_id": user_id, "workflow_id": i["workflow_id"]},
+    )
+
+    return counts

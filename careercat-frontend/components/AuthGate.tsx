@@ -23,20 +23,19 @@ function MailIcon() {
   );
 }
 
-// Dark-theme CSS variable overrides so the auth gate renders correctly
-// even when nested inside the light app theme context.
-const darkThemeVars = {
-  "--color-bg": "var(--brand-ink-700)",
-  "--color-bg-elev-1": "rgba(255,255,255,0.05)",
-  "--color-bg-elev-2": "rgba(255,255,255,0.09)",
-  "--color-border": "rgba(255,255,255,0.10)",
-  "--color-border-strong": "rgba(255,255,255,0.18)",
-  "--color-text-primary": "#ffffff",
-  "--color-text-secondary": "#c8d0e2",
-  "--color-text-muted": "#8b95ad",
-  "--color-text-accent": "var(--brand-honey-400)",
+// Light-theme CSS variable overrides matching the marketing homepage.
+const lightThemeVars = {
+  "--color-bg": "var(--brand-cream-50)",
+  "--color-bg-elev-1": "#ffffff",
+  "--color-bg-elev-2": "var(--neutral-50)",
+  "--color-border": "var(--neutral-200)",
+  "--color-border-strong": "var(--neutral-300)",
+  "--color-text-primary": "var(--neutral-900)",
+  "--color-text-secondary": "var(--neutral-700)",
+  "--color-text-muted": "var(--neutral-500)",
+  "--color-text-accent": "var(--brand-honey-600)",
   "--color-accent": "var(--brand-honey-400)",
-  "--color-accent-hover": "var(--brand-honey-300)",
+  "--color-accent-hover": "var(--brand-honey-500)",
   "--color-accent-text": "var(--brand-ink-700)",
 } as React.CSSProperties;
 
@@ -70,7 +69,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     return (
       <main
         className="flex min-h-screen items-center justify-center px-6"
-        style={{ background: "var(--brand-ink-700)", ...darkThemeVars }}
+        style={{ background: "var(--brand-cream-50)", ...lightThemeVars }}
       >
         <div className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-elev-1)] px-8 py-6 text-[var(--color-text-secondary)]">
           {t("auth.loadingAccount")}
@@ -171,7 +170,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   return (
     <main
       className="relative min-h-screen overflow-hidden px-4 py-12 sm:px-6 lg:px-8"
-      style={{ background: "var(--brand-ink-700)", ...darkThemeVars }}
+      style={{ background: "var(--brand-cream-50)", ...lightThemeVars }}
     >
       {/* Radial glow — matches homepage hero */}
       <div
@@ -195,7 +194,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
             {t("auth.brandHeadline")}{" "}
             <span
               style={{
-                background: "linear-gradient(100deg, var(--brand-honey-400) 0%, var(--brand-honey-200) 55%, var(--brand-honey-400) 100%)",
+                background: "linear-gradient(100deg, var(--brand-honey-600) 0%, var(--brand-honey-400) 55%, var(--brand-honey-600) 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",

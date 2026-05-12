@@ -672,13 +672,14 @@ export const en = {
       subtitle:
         "Manage how CareerCat looks, what language it speaks, and how your account is connected.",
       sectionAccount: "Account",
-      sectionAccountBody:
-        "Cognito email or local browser-generated id. Sign out below to switch users.",
-      accountModeCognito: "Signed in with Cognito",
-      accountModeLocal: "Local browser account",
+      sectionAccountBody: "Manage your sign-in and account preferences.",
+      accountModeCognito: "Signed in as",
+      accountModeLocal: "Using a local session",
       accountIdLabel: "Account ID",
+      emailLabel: "Email",
       signOut: "Sign out",
       newLocal: "Start a new local account",
+      cancel: "Cancel",
       sectionLanguage: "Language",
       sectionLanguageBody:
         "Pick the language for the interface and AI agent replies.",
@@ -690,7 +691,22 @@ export const en = {
         "Edit personal information, education, experience, and target preferences.",
       resumeButton: "Open profile →",
       newLocalConfirm:
-        "Start a new local testing account on this browser? Unsaved changes will be lost.",
+        "Start a new local session on this browser? Your current data will no longer be accessible.",
+      sectionDanger: "Danger zone",
+      sectionDangerBody:
+        "Permanently delete your CareerCat account and all associated data. This action cannot be undone.",
+      deleteAccount: "Delete account",
+      deleteWarningTitle: "Before you delete your account",
+      deleteWarningBody:
+        "All your data will be permanently removed — resume, saved jobs, application history, coach sessions, and AI workspace history. This cannot be recovered.",
+      deleteStep1: "Send a verification code to your email to confirm your identity.",
+      deleteSendCode: "Send verification code",
+      deleteCodeLabel: "Verification code",
+      deleteCodePlaceholder: "Enter 6-digit code",
+      deleteCodeSentInfo: "We've sent a 6-digit verification code to your email. Enter it below to confirm deletion.",
+      deleteConfirmButton: "Permanently delete my account",
+      deleteConfirmWorking: "Deleting…",
+      deleteSuccess: "Your account has been deleted.",
     },
 
     insights: {
@@ -1397,23 +1413,38 @@ export const zh = {
       subtitle:
         "管理 CareerCat 的外观、界面语言和你的账号连接方式。",
       sectionAccount: "账号",
-      sectionAccountBody:
-        "Cognito 登录邮箱或本地浏览器生成的账号 ID。点击下方退出可切换账号。",
-      accountModeCognito: "已通过 Cognito 登录",
-      accountModeLocal: "本地浏览器账号",
+      sectionAccountBody: "管理你的登录方式和账号设置。",
+      accountModeCognito: "已登录",
+      accountModeLocal: "正在使用本地会话",
       accountIdLabel: "账号 ID",
+      emailLabel: "邮箱",
       signOut: "退出登录",
       newLocal: "创建新的本地账号",
+      cancel: "取消",
       sectionLanguage: "语言",
       sectionLanguageBody: "选择界面与 AI 智能体回复使用的语言。",
       sectionPlan: "套餐与账单",
       sectionPlanBody: "当前为免费版。在价格页查看限制和升级方案。",
       planButton: "查看套餐 →",
       sectionResume: "简历与个人资料",
-      sectionResumeBody:
-        "编辑姓名、教育、经历和岗位偏好等信息。",
+      sectionResumeBody: "编辑姓名、教育、经历和岗位偏好等信息。",
       resumeButton: "打开个人资料 →",
-      newLocalConfirm: "在当前浏览器创建一个新的本地测试账号？未保存的更改会丢失。",
+      newLocalConfirm: "在当前浏览器开始新的本地会话？当前数据将无法继续访问。",
+      sectionDanger: "危险操作",
+      sectionDangerBody:
+        "永久删除你的 CareerCat 账号及所有相关数据。此操作不可撤销。",
+      deleteAccount: "注销账号",
+      deleteWarningTitle: "注销前请注意",
+      deleteWarningBody:
+        "你的所有数据将被永久删除，包括简历、已保存岗位、投递记录、教练会话和 AI 工作区历史。删除后无法恢复。",
+      deleteStep1: "我们将向你的注册邮箱发送验证码，确认身份后方可注销。",
+      deleteSendCode: "发送验证码",
+      deleteCodeLabel: "验证码",
+      deleteCodePlaceholder: "输入 6 位验证码",
+      deleteCodeSentInfo: "我们已将 6 位验证码发送到你的注册邮箱，请输入以确认注销。",
+      deleteConfirmButton: "永久注销我的账号",
+      deleteConfirmWorking: "注销中……",
+      deleteSuccess: "你的账号已成功注销。",
     },
 
     insights: {

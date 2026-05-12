@@ -13,6 +13,11 @@
 - [2026-05-11] improve(auth): 邮箱验证步骤改为独立 verify view，显示目标邮箱，更清晰的说明文字 | 文件: components/AuthGate.tsx
 - [2026-05-11] improve(auth): 新增密码显示/隐藏切换、密码强度提示、确认密码字段 | 文件: components/AuthGate.tsx
 - [2026-05-11] feat(i18n): 扩充登录注册相关 i18n key，中英双语 | 文件: lib/i18n/dictionaries.ts
+- [2026-05-11] improve(auth): 注册/登录页背景改为首页浅奶油色，文字改深色 | 文件: components/AuthGate.tsx
+- [2026-05-11] improve(settings): 账号页移除技术性 ID 展示，改为仅显示邮箱；新增危险区注销功能 | 文件: app/(app)/settings/page.tsx
+- [2026-05-11] feat(settings): 注销账号需邮箱验证码确认，提醒用户数据永久删除 | 文件: app/(app)/settings/page.tsx
+- [2026-05-11] feat(backend): 新增用户注销 API（POST /user/request-deletion, DELETE /user），邮件验证码 + 永久删除 Cognito 用户及所有 DynamoDB 数据 | 文件: careercat-backend/app/routers/user.py, app/services/dynamodb_service.py
+- [2026-05-11] feat(i18n): 补充 settings 模块 emailLabel、cancel、deleteCodeSentInfo 中英文 key | 文件: lib/i18n/dictionaries.ts
 
 ---
 

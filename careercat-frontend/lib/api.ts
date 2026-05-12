@@ -463,3 +463,37 @@ export async function deleteWorkflowHistory(userId: string, workflowId: string) 
 
   return response.json();
 }
+
+/* =========================
+   Account Deletion
+========================= */
+
+export async function requestAccountDeletion(email: string) {
+  const response = await fetch(`${API_BASE_URL}/user/request-deletion`, {
+    method: "POST",
+    headers: await buildHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to send verification code");
+  }
+
+  return response.json();
+}
+
+export async function deleteAccount(email: string, code: string) {
+  const response = await fetch(`${API_BASE_URL}/user`, {
+    method: "DELETE",
+    headers: await buildHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ email, code }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Failed to delete account");
+  }
+
+  return response.json();
+}
