@@ -18,6 +18,7 @@ app = FastAPI(title="CareerCat API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.amplifyapp\.com|https://.*\.awsapprunner\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
